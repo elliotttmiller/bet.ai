@@ -3,6 +3,7 @@ import KPIBar from '../components/KPIBar'
 import FilterControls from '../components/FilterControls'
 import PredictionRow from '../components/PredictionRow'
 import TrackPredictionModal from '../components/TrackPredictionModal'
+import { apiClient, ApiError } from '../lib/api-client'
 import './DashboardPage.css'
 
 const API_BASE = 'http://localhost:8000'
@@ -26,29 +27,33 @@ function DashboardPage() {
   const [selectedPrediction, setSelectedPrediction] = useState(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
 
-  // Fetch dashboard data
+  // Fetch dashboard data using type-safe client
   const fetchDashboardStats = async () => {
     try {
-      const response = await fetch(`${API_BASE}/api/dashboard/stats`)
-      if (!response.ok) throw new Error('Failed to fetch dashboard stats')
-      const data = await response.json()
+      const data = await apiClient.getDashboardStats()
       setDashboardStats(data)
     } catch (err) {
-      setError('Failed to load dashboard statistics')
+      if (err instanceof ApiError) {
+        setError(`Failed to load dashboard statistics: ${err.message}`)
+      } else {
+        setError('Failed to load dashboard statistics')
+      }
       console.error('Dashboard stats error:', err)
     }
   }
 
-  // Fetch predictions
+  // Fetch predictions using type-safe client
   const fetchPredictions = async () => {
     try {
-      const response = await fetch(`${API_BASE}/api/predictions`)
-      if (!response.ok) throw new Error('Failed to fetch predictions')
-      const data = await response.json()
+      const data = await apiClient.getPredictions()
       setPredictions(data)
       setFilteredPredictions(data)
     } catch (err) {
-      setError('Failed to load predictions')
+      if (err instanceof ApiError) {
+        setError(`Failed to load predictions: ${err.message}`)
+      } else {
+        setError('Failed to load predictions')
+      }
       console.error('Predictions error:', err)
     }
   }
@@ -104,21 +109,10 @@ function DashboardPage() {
     setIsModalOpen(true)
   }
 
-  // Handle prediction tracking confirmation
+  // Handle prediction tracking confirmation using type-safe client
   const handleTrackingConfirm = async (trackingData) => {
     try {
-      const response = await fetch(`${API_BASE}/api/bets`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(trackingData)
-      })
-
-      if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.detail || 'Failed to track prediction')
-      }
+      await apiClient.trackPrediction(trackingData)
 
       // Refresh dashboard stats after successful tracking
       await fetchDashboardStats()
@@ -131,6 +125,9 @@ function DashboardPage() {
       alert('✅ Prediction tracked successfully!')
       
     } catch (err) {
+      if (err instanceof ApiError) {
+        throw new Error(err.message)
+      }
       throw err // Re-throw to be handled by modal
     }
   }
@@ -191,12 +188,13 @@ function DashboardPage() {
             </div>
           ) : (
             <div className="predictions-list">
-              {filteredPredictions.map((prediction) => (
-                <PredictionRow
-                  key={prediction.prediction_id}
-                  prediction={prediction}
-                  onTrackPrediction={handleTrackPrediction}
-                />
+              {filteredPredictions.map((prediction, index) => (
+                <div key={prediction.prediction_id} className="stagger-fade-in" style={{ animationDelay: `${index * 0.1}s` }}>
+                  <PredictionRow
+                    prediction={prediction}
+                    onTrackPrediction={handleTrackPrediction}
+                  />
+                </div>
               ))}
             </div>
           )}

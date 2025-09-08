@@ -33,7 +33,7 @@ function PredictionRow({ prediction, onTrackPrediction }) {
   }
 
   return (
-    <Card className="prediction-row bg-card border-border hover:bg-card/80 transition-colors">
+    <Card className="prediction-row bg-card border-border hover:bg-card/80 transition-all duration-300 hover:shadow-lg hover:-translate-y-1 premium-hover">
       <CardContent className="p-6">
         <div className="flex flex-col lg:flex-row lg:items-center gap-6">
           {/* Matchup Section */}
