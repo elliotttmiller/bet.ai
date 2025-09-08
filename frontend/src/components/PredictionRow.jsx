@@ -2,7 +2,7 @@ import ConfidenceGauge from './ConfidenceGauge'
 import ResultTag from './ResultTag'
 import './PredictionRow.css'
 
-function PredictionRow({ prediction, onLogBet }) {
+function PredictionRow({ prediction, onLogBet, className = '', style = {} }) {
   const handleLogBet = () => {
     if (onLogBet) {
       onLogBet(prediction)
@@ -31,7 +31,7 @@ function PredictionRow({ prediction, onLogBet }) {
   }
 
   return (
-    <div className="prediction-row">
+    <div className={`prediction-row ${className}`} style={style}>
       {/* Matchup Section */}
       <div className="prediction-matchup">
         <div className="matchup-header">

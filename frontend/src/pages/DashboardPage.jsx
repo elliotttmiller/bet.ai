@@ -3,9 +3,8 @@ import KPIBar from '../components/KPIBar'
 import FilterControls from '../components/FilterControls'
 import PredictionRow from '../components/PredictionRow'
 import BetModal from '../components/BetModal'
+import { api } from '../lib/parlant'
 import './DashboardPage.css'
-
-const API_BASE = 'http://localhost:8000'
 
 function DashboardPage() {
   const [dashboardStats, setDashboardStats] = useState({
@@ -26,12 +25,10 @@ function DashboardPage() {
   const [selectedPrediction, setSelectedPrediction] = useState(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
 
-  // Fetch dashboard data
+  // Fetch dashboard data using Parlant client
   const fetchDashboardStats = async () => {
     try {
-      const response = await fetch(`${API_BASE}/api/dashboard/stats`)
-      if (!response.ok) throw new Error('Failed to fetch dashboard stats')
-      const data = await response.json()
+      const data = await api.getDashboardStats()
       setDashboardStats(data)
     } catch (err) {
       setError('Failed to load dashboard statistics')
@@ -39,12 +36,10 @@ function DashboardPage() {
     }
   }
 
-  // Fetch predictions
+  // Fetch predictions using Parlant client
   const fetchPredictions = async () => {
     try {
-      const response = await fetch(`${API_BASE}/api/predictions`)
-      if (!response.ok) throw new Error('Failed to fetch predictions')
-      const data = await response.json()
+      const data = await api.getPredictions()
       setPredictions(data)
       setFilteredPredictions(data)
     } catch (err) {
@@ -104,21 +99,10 @@ function DashboardPage() {
     setIsModalOpen(true)
   }
 
-  // Handle bet confirmation
+  // Handle bet confirmation using Parlant client
   const handleBetConfirm = async (betData) => {
     try {
-      const response = await fetch(`${API_BASE}/api/bets`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(betData)
-      })
-
-      if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.detail || 'Failed to place bet')
-      }
+      await api.addBet(betData)
 
       // Refresh dashboard stats after successful bet
       await fetchDashboardStats()
@@ -138,9 +122,51 @@ function DashboardPage() {
   if (loading) {
     return (
       <div className="dashboard-page">
-        <div className="loading-container">
-          <div className="loading-spinner"></div>
-          <p>Loading dashboard...</p>
+        <div className="dashboard-container">
+          {/* Page Header */}
+          <div className="page-header">
+            <h1>Dashboard</h1>
+            <p>Real-time betting performance and AI predictions</p>
+          </div>
+
+          {/* KPI Bar Skeleton */}
+          <div className="skeleton-kpi-bar">
+            <div className="skeleton-kpi-card"></div>
+            <div className="skeleton-kpi-card"></div>
+            <div className="skeleton-kpi-card"></div>
+            <div className="skeleton-kpi-card"></div>
+          </div>
+
+          {/* Filter Controls Skeleton */}
+          <div className="skeleton-filter-controls">
+            <div className="skeleton-filter"></div>
+            <div className="skeleton-filter"></div>
+          </div>
+
+          {/* Predictions Skeleton */}
+          <div className="predictions-section">
+            <div className="section-header">
+              <h2>🤖 ML Predictions</h2>
+              <span className="predictions-count skeleton-text"></span>
+            </div>
+            
+            <div className="predictions-list">
+              {[...Array(3)].map((_, index) => (
+                <div key={index} className="skeleton-prediction-row">
+                  <div className="skeleton-content">
+                    <div className="skeleton-line long"></div>
+                    <div className="skeleton-line medium"></div>
+                    <div className="skeleton-line short"></div>
+                  </div>
+                  <div className="skeleton-gauge"></div>
+                  <div className="skeleton-actions">
+                    <div className="skeleton-button"></div>
+                    <div className="skeleton-line short"></div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
       </div>
     )
@@ -191,11 +217,13 @@ function DashboardPage() {
             </div>
           ) : (
             <div className="predictions-list">
-              {filteredPredictions.map((prediction) => (
+              {filteredPredictions.map((prediction, index) => (
                 <PredictionRow
                   key={prediction.prediction_id}
                   prediction={prediction}
                   onLogBet={handleLogBet}
+                  className="fade-in-delayed"
+                  style={{ animationDelay: `${index * 0.1}s` }}
                 />
               ))}
             </div>

@@ -1,11 +1,23 @@
+import { useEffect, useState } from 'react'
 import './ConfidenceGauge.css'
 
 function ConfidenceGauge({ confidence, size = 60 }) {
+  const [animatedConfidence, setAnimatedConfidence] = useState(0)
+  
   // Ensure confidence is between 0-100
   const normalizedConfidence = Math.max(0, Math.min(100, confidence))
   
+  // Animate to target confidence over 500ms
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setAnimatedConfidence(normalizedConfidence)
+    }, 100) // Small delay to ensure component is mounted
+    
+    return () => clearTimeout(timer)
+  }, [normalizedConfidence])
+  
   // Calculate angle for conic gradient (360 degrees = 100%)
-  const angle = (normalizedConfidence / 100) * 360
+  const angle = (animatedConfidence / 100) * 360
   
   // Determine confidence level and color
   let confidenceClass = 'confidence-low'
@@ -19,6 +31,7 @@ function ConfidenceGauge({ confidence, size = 60 }) {
   
   const gaugeStyle = {
     '--confidence-angle': `${angle}deg`,
+    '--target-angle': `${(normalizedConfidence / 100) * 360}deg`,
     width: `${size}px`,
     height: `${size}px`
   }

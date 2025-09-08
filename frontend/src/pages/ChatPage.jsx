@@ -1,7 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
+import { api } from '../lib/parlant'
 import './ChatPage.css'
-
-const API_BASE = 'http://localhost:8000'
 
 function ChatPage() {
   const [messages, setMessages] = useState([
@@ -48,21 +47,7 @@ function ChatPage() {
     setError('')
 
     try {
-      const response = await fetch(`${API_BASE}/api/betai/query`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          message: userMessage.content
-        })
-      })
-
-      if (!response.ok) {
-        throw new Error('Failed to get response from BetAI')
-      }
-
-      const data = await response.json()
+      const data = await api.betaiQuery({ message: userMessage.content })
 
       // Add AI response
       const aiMessage = {
@@ -75,14 +60,14 @@ function ChatPage() {
       setMessages(prev => [...prev, aiMessage])
 
     } catch (err) {
-      setError('Failed to connect to BetAI. Please ensure LM Studio is running on localhost:1234')
+      setError('Failed to connect to BetAI. Please try again.')
       console.error('Chat error:', err)
       
       // Add error message to chat
       const errorMessage = {
         id: Date.now() + 1,
         type: 'error',
-        content: 'Sorry, I\'m having trouble connecting right now. Please make sure LM Studio is running and try again.',
+        content: 'Sorry, I\'m having trouble connecting right now. Please try again.',
         timestamp: new Date()
       }
       setMessages(prev => [...prev, errorMessage])
