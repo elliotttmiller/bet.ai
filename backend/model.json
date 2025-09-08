@@ -1,12 +1,42 @@
 {
-  "model_version": "v1.0-stats",
-  "weights": {
-    "win_rate_home": 0.35,
-    "win_rate_away": 0.35,
-    "home_advantage": 0.15,
-    "point_differential_home": 0.075,
-    "point_differential_away": 0.075
+  "model_version": "v2.0-lightgbm",
+  "model_type": "LightGBM",
+  "num_features": 22,
+  "feature_columns": [
+    "is_home",
+    "strength_of_schedule",
+    "rest_days",
+    "win_rate_5g",
+    "avg_points_5g",
+    "avg_points_allowed_5g",
+    "point_diff_5g",
+    "form_5g",
+    "win_rate_10g",
+    "avg_points_10g",
+    "avg_points_allowed_10g",
+    "point_diff_10g",
+    "form_10g",
+    "win_rate_20g",
+    "avg_points_20g",
+    "avg_points_allowed_20g",
+    "point_diff_20g",
+    "form_20g",
+    "h2h_wins",
+    "h2h_games",
+    "h2h_win_rate",
+    "h2h_avg_margin"
+  ],
+  "lgb_params": {
+    "objective": "binary",
+    "metric": "binary_logloss",
+    "boosting_type": "gbdt",
+    "num_leaves": 31,
+    "learning_rate": 0.05,
+    "feature_fraction": 0.9,
+    "bagging_fraction": 0.8,
+    "bagging_freq": 5,
+    "verbose": -1,
+    "random_state": 42
   },
-  "home_advantage_boost": 0.05,
-  "trained_at": "2025-09-08T08:39:50.981599"
+  "trained_at": "2025-09-08T22:12:47.278667"
 }
