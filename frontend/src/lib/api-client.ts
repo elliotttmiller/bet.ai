@@ -17,7 +17,7 @@ type PostResponse<T extends keyof ApiPaths> =
     ? R
     : never
 
-const API_BASE = 'http://localhost:8000'
+const API_BASE = 'http://localhost:8001'
 
 class ApiError extends Error {
   constructor(public status: number, message: string, public response?: any) {

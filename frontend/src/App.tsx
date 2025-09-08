@@ -2,6 +2,7 @@ import { BrowserRouter as Router, Routes, Route } from 'react-router-dom'
 import { SiteHeader } from '@/components/site-header'
 import { DashboardPage } from '@/pages/dashboard-page'
 import { ChatPage } from '@/pages/chat-page'
+import { PerformancePage } from '@/pages/performance-page'
 import './App.css'
 
 function App() {
@@ -14,6 +15,7 @@ function App() {
             <Routes>
               <Route path="/" element={<DashboardPage />} />
               <Route path="/predictions" element={<DashboardPage />} />
+              <Route path="/performance" element={<PerformancePage />} />
               <Route path="/betai" element={<ChatPage />} />
             </Routes>
           </div>

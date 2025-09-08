@@ -1,11 +1,10 @@
 import { cn } from "@/lib/utils"
-import { Button } from "@/components/ui/button"
 import { 
-  BarChart3, 
   TrendingUp, 
   MessageSquare, 
   Target,
-  Home
+  Home,
+  LineChart
 } from "lucide-react"
 import { Link, useLocation } from "react-router-dom"
 
@@ -43,6 +42,16 @@ export function MainNav({
       >
         <TrendingUp className="h-4 w-4 mr-2 inline" />
         Predictions
+      </Link>
+      <Link
+        to="/performance"
+        className={cn(
+          "text-sm font-medium transition-colors hover:text-primary",
+          location.pathname === "/performance" ? "text-foreground" : "text-muted-foreground"
+        )}
+      >
+        <LineChart className="h-4 w-4 mr-2 inline" />
+        Performance
       </Link>
       <Link
         to="/betai"

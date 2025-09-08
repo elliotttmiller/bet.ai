@@ -48,7 +48,7 @@ export function ChatPage() {
     setLoading(true)
 
     try {
-      const response = await fetch('http://localhost:8000/api/betai/query', {
+      const response = await fetch('http://localhost:8001/api/betai/query', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
