@@ -40,7 +40,7 @@ export function PredictionTable() {
   const fetchPredictions = async () => {
     try {
       setLoading(true)
-      const response = await fetch('http://localhost:8000/api/predictions')
+      const response = await fetch('http://localhost:8001/api/predictions')
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`)
       }

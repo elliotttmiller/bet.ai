@@ -7,24 +7,36 @@ Enterprise-grade betting analytics API with AI integration
 import os
 import sqlite3
 import requests
-from datetime import datetime
+import subprocess
+import sys
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import List, Optional, Dict, Any
 from contextlib import contextmanager
+import logging
 
 from fastapi import FastAPI, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from dotenv import load_dotenv
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from apscheduler.triggers.cron import CronTrigger
 
 # Load environment variables
 load_dotenv()
 
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
 app = FastAPI(
     title="Bet Copilot API",
-    description="Enterprise-grade betting analytics with AI integration",
+    description="Enterprise-grade betting analytics with AI integration and autonomous operation",
     version="1.0.0"
 )
+
+# Initialize scheduler for autonomous operation
+scheduler = AsyncIOScheduler()
 
 # CORS middleware for frontend integration
 app.add_middleware(
@@ -35,9 +47,11 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Database path
+# Database path and API configuration
 DB_PATH = Path(__file__).parent.parent / "database" / "bet_copilot.db"
 LM_STUDIO_API_URL = os.getenv("LM_STUDIO_API_URL", "http://localhost:1234/v1/chat/completions")
+ODDS_API_KEY = os.getenv("ODDS_API_KEY", "")
+ODDS_API_URL = os.getenv("ODDS_API_URL", "https://api.the-odds-api.com/v4")
 
 # Pydantic models
 class BetCreate(BaseModel):
@@ -87,6 +101,21 @@ class PredictionResponse(BaseModel):
 class BetAIQuery(BaseModel):
     message: str = Field(..., min_length=1, max_length=1000)
 
+class PerformanceDataPoint(BaseModel):
+    date: str
+    profit_loss: float
+    running_balance: float
+    cumulative_profit: float
+
+class PerformanceHistory(BaseModel):
+    data_points: List[PerformanceDataPoint]
+    total_profit_loss: float
+    total_bets: int
+    win_rate: float
+    roi: float
+    best_day: float
+    worst_day: float
+
 # Database context manager
 @contextmanager
 def get_db():
@@ -117,6 +146,77 @@ def get_current_balance() -> float:
         cursor.execute("SELECT running_balance FROM ledger ORDER BY entry_id DESC LIMIT 1")
         result = cursor.fetchone()
         return result[0] if result else 0.0
+
+# Autonomous Engine Functions
+async def run_data_pipeline():
+    """Autonomous data pipeline execution."""
+    try:
+        logger.info("🤖 Starting autonomous data pipeline...")
+        pipeline_path = Path(__file__).parent / "data_pipeline.py"
+        result = subprocess.run([sys.executable, str(pipeline_path)], 
+                              capture_output=True, text=True, timeout=300)
+        
+        if result.returncode == 0:
+            logger.info("✅ Data pipeline completed successfully")
+        else:
+            logger.error(f"❌ Data pipeline failed: {result.stderr}")
+    except Exception as e:
+        logger.error(f"❌ Data pipeline error: {e}")
+
+async def run_model_training():
+    """Autonomous model training execution."""
+    try:
+        logger.info("🤖 Starting autonomous model training...")
+        trainer_path = Path(__file__).parent / "model_trainer.py"
+        result = subprocess.run([sys.executable, str(trainer_path)], 
+                              capture_output=True, text=True, timeout=600)
+        
+        if result.returncode == 0:
+            logger.info("✅ Model training completed successfully")
+        else:
+            logger.error(f"❌ Model training failed: {result.stderr}")
+    except Exception as e:
+        logger.error(f"❌ Model training error: {e}")
+
+@app.on_event("startup")
+async def startup_event():
+    """Initialize autonomous scheduling on startup."""
+    if os.getenv("ENABLE_SCHEDULER", "true").lower() == "true":
+        try:
+            # Schedule daily data pipeline at 3 AM
+            data_hour = int(os.getenv("DATA_PIPELINE_HOUR", "3"))
+            scheduler.add_job(
+                run_data_pipeline,
+                CronTrigger(hour=data_hour, minute=0),
+                id="daily_data_pipeline",
+                replace_existing=True
+            )
+            
+            # Schedule weekly model training on Sunday at 3 AM
+            training_day = int(os.getenv("MODEL_TRAINING_DAY", "6"))  # 6 = Sunday
+            training_hour = int(os.getenv("MODEL_TRAINING_HOUR", "3"))
+            scheduler.add_job(
+                run_model_training,
+                CronTrigger(day_of_week=training_day, hour=training_hour, minute=0),
+                id="weekly_model_training",
+                replace_existing=True
+            )
+            
+            scheduler.start()
+            logger.info("🤖 Autonomous scheduling engine initialized")
+            logger.info(f"📅 Data pipeline scheduled daily at {data_hour:02d}:00")
+            logger.info(f"📅 Model training scheduled weekly on day {training_day} at {training_hour:02d}:00")
+        except Exception as e:
+            logger.error(f"❌ Failed to initialize scheduler: {e}")
+    else:
+        logger.info("⏸️ Autonomous scheduling disabled by configuration")
+
+@app.on_event("shutdown")
+async def shutdown_event():
+    """Cleanup scheduler on shutdown."""
+    if scheduler.running:
+        scheduler.shutdown()
+        logger.info("🛑 Autonomous scheduling engine stopped")
 
 # API Endpoints
 
@@ -286,11 +386,54 @@ async def settle_bet(bet_id: int, settle: BetSettle):
         row = cursor.fetchone()
         return BetResponse(**dict(row))
 
+async def fetch_live_odds(sport: str = "upcoming") -> List[Dict[str, Any]]:
+    """Fetch live odds from The Odds API."""
+    if not ODDS_API_KEY or ODDS_API_KEY == "your_odds_api_key_here":
+        logger.warning("⚠️ No valid odds API key configured, using mock data")
+        return []
+    
+    try:
+        # Get upcoming games with odds
+        url = f"{ODDS_API_URL}/sports/{sport}/odds"
+        params = {
+            "apiKey": ODDS_API_KEY,
+            "regions": "us",
+            "markets": "h2h,spreads,totals",
+            "oddsFormat": "american",
+            "dateFormat": "iso"
+        }
+        
+        response = requests.get(url, params=params, timeout=10)
+        response.raise_for_status()
+        
+        return response.json()
+    except Exception as e:
+        logger.error(f"❌ Failed to fetch live odds: {e}")
+        return []
+
+def calculate_implied_probability(american_odds: int) -> float:
+    """Convert American odds to implied probability."""
+    if american_odds > 0:
+        return 100 / (american_odds + 100) * 100
+    else:
+        return abs(american_odds) / (abs(american_odds) + 100) * 100
+
+def calculate_edge(model_probability: float, market_odds: int) -> Optional[float]:
+    """Calculate betting edge (+EV percentage)."""
+    try:
+        implied_probability = calculate_implied_probability(market_odds)
+        edge = model_probability - implied_probability
+        return round(edge, 2)
+    except:
+        return None
+
 @app.get("/api/predictions", response_model=List[PredictionResponse])
 async def get_predictions(limit: int = 10):
-    """Get AI-generated ML predictions using LightGBM model."""
+    """Get AI-generated ML predictions with live odds integration and edge calculation."""
     with get_db() as conn:
         cursor = conn.cursor()
+        
+        # Get existing predictions
         cursor.execute("""
             SELECT * FROM predictions 
             ORDER BY created_at DESC 
@@ -298,22 +441,17 @@ async def get_predictions(limit: int = 10):
         """, (limit,))
         
         rows = cursor.fetchall()
+        
+        # If no predictions exist, generate new ones
         if not rows:
-            # If no predictions exist, generate new ones using LightGBM model
-            print("No predictions found, generating new LightGBM predictions...")
+            logger.info("No predictions found, generating new LightGBM predictions...")
             try:
-                from pathlib import Path
-                import subprocess
-                import sys
-                
-                # Run the model trainer to generate predictions
                 trainer_path = Path(__file__).parent / "model_trainer.py"
                 result = subprocess.run([sys.executable, str(trainer_path)], 
                                       capture_output=True, text=True, timeout=120)
                 
                 if result.returncode == 0:
-                    print("LightGBM model training completed successfully")
-                    # Fetch the newly generated predictions
+                    logger.info("✅ LightGBM model training completed successfully")
                     cursor.execute("""
                         SELECT * FROM predictions 
                         ORDER BY created_at DESC 
@@ -321,8 +459,8 @@ async def get_predictions(limit: int = 10):
                     """, (limit,))
                     rows = cursor.fetchall()
                 else:
-                    print(f"Model training failed: {result.stderr}")
-                    # Generate fallback predictions with LightGBM indicator
+                    logger.warning("⚠️ Model training failed, using fallback predictions")
+                    # Generate enhanced fallback predictions with market simulation
                     fallback_predictions = [
                         {
                             "matchup": "Lakers vs Warriors",
@@ -397,9 +535,133 @@ async def get_predictions(limit: int = 10):
                     rows = cursor.fetchall()
                 
             except Exception as e:
-                print(f"Error generating LightGBM predictions: {e}")
+                logger.error(f"❌ Error generating LightGBM predictions: {e}")
         
-        return [PredictionResponse(**dict(row)) for row in rows]
+        # Convert to prediction objects and enhance with live odds
+        predictions = []
+        live_odds_data = await fetch_live_odds()
+        
+        for row in rows:
+            prediction = PredictionResponse(**dict(row))
+            
+            # Try to match with live odds and recalculate edge
+            if live_odds_data:
+                for game in live_odds_data:
+                    # Simple matching logic (could be enhanced)
+                    game_teams = f"{game.get('home_team', '')} vs {game.get('away_team', '')}"
+                    if any(team in prediction.matchup for team in [game.get('home_team', ''), game.get('away_team', '')]):
+                        # Find best odds for our prediction type
+                        best_odds = None
+                        for bookmaker in game.get('bookmakers', []):
+                            for market in bookmaker.get('markets', []):
+                                if market['key'] == 'h2h':  # Money line market
+                                    for outcome in market['outcomes']:
+                                        if prediction.predicted_pick.startswith(outcome['name']):
+                                            if best_odds is None or abs(outcome['price']) < abs(best_odds):
+                                                best_odds = outcome['price']
+                        
+                        if best_odds:
+                            # Recalculate edge with live market odds
+                            edge = calculate_edge(prediction.confidence_score, best_odds)
+                            if edge is not None:
+                                prediction.calculated_edge = edge
+                                prediction.predicted_odds = best_odds
+                        break
+            
+            predictions.append(prediction)
+        
+        # Sort by calculated edge (highest first) for +EV opportunities
+        predictions.sort(key=lambda x: x.calculated_edge if x.calculated_edge else 0, reverse=True)
+        
+        return predictions
+
+@app.get("/api/performance/history", response_model=PerformanceHistory)
+async def get_performance_history():
+    """Get historical performance data for visualization."""
+    with get_db() as conn:
+        cursor = conn.cursor()
+        
+        # Get daily profit/loss aggregation from bets
+        cursor.execute("""
+            SELECT 
+                DATE(created_at) as bet_date,
+                SUM(CASE WHEN status = 'Won' THEN profit_loss WHEN status = 'Lost' THEN -stake ELSE 0 END) as daily_pl,
+                COUNT(*) as bet_count
+            FROM bets 
+            WHERE status IN ('Won', 'Lost')
+            GROUP BY DATE(created_at)
+            ORDER BY bet_date ASC
+        """)
+        
+        daily_results = cursor.fetchall()
+        
+        # Get overall statistics
+        cursor.execute("""
+            SELECT 
+                COALESCE(SUM(profit_loss), 0) as total_pl,
+                COUNT(*) as total_bets,
+                COUNT(CASE WHEN status = 'Won' THEN 1 END) as wins,
+                COUNT(CASE WHEN status = 'Lost' THEN 1 END) as losses,
+                COALESCE(SUM(stake), 0) as total_stakes
+            FROM bets 
+            WHERE status IN ('Won', 'Lost')
+        """)
+        
+        stats = cursor.fetchone()
+        
+        # Calculate performance metrics
+        total_profit_loss = stats[0] if stats else 0.0
+        total_bets = stats[1] if stats else 0
+        wins = stats[2] if stats else 0
+        losses = stats[3] if stats else 0
+        total_stakes = stats[4] if stats else 0
+        
+        win_rate = (wins / (wins + losses) * 100) if (wins + losses) > 0 else 0.0
+        roi = (total_profit_loss / total_stakes * 100) if total_stakes > 0 else 0.0
+        
+        # Build time series data
+        data_points = []
+        cumulative_profit = 0.0
+        running_balance = 1000.0  # Starting balance
+        best_day = 0.0
+        worst_day = 0.0
+        
+        for row in daily_results:
+            bet_date, daily_pl, bet_count = row
+            cumulative_profit += daily_pl
+            running_balance += daily_pl
+            
+            if daily_pl > best_day:
+                best_day = daily_pl
+            if daily_pl < worst_day:
+                worst_day = daily_pl
+            
+            data_points.append(PerformanceDataPoint(
+                date=bet_date,
+                profit_loss=daily_pl,
+                running_balance=running_balance,
+                cumulative_profit=cumulative_profit
+            ))
+        
+        # If no historical data, create sample point with current balance
+        if not data_points:
+            current_balance = get_current_balance()
+            data_points.append(PerformanceDataPoint(
+                date=datetime.now().strftime('%Y-%m-%d'),
+                profit_loss=0.0,
+                running_balance=current_balance,
+                cumulative_profit=current_balance - 1000.0
+            ))
+        
+        return PerformanceHistory(
+            data_points=data_points,
+            total_profit_loss=total_profit_loss,
+            total_bets=total_bets,
+            win_rate=win_rate,
+            roi=roi,
+            best_day=best_day,
+            worst_day=worst_day
+        )
 
 @app.post("/api/betai/query")
 async def query_betai(query: BetAIQuery):

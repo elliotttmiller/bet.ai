@@ -31,7 +31,7 @@ export function DashboardStats() {
   const fetchStats = async () => {
     try {
       setLoading(true)
-      const response = await fetch('http://localhost:8000/api/dashboard/stats')
+      const response = await fetch('http://localhost:8001/api/dashboard/stats')
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`)
       }
