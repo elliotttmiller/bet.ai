@@ -1,29 +1,21 @@
 import { useState, useEffect } from 'react'
 import { 
   Card, 
-  CardBody, 
+  CardContent, 
   CardHeader,
-  Table, 
-  TableHeader, 
-  TableColumn, 
-  TableBody, 
-  TableRow, 
-  TableCell,
-  Progress,
   Button,
+  Input,
+  Textarea,
+  Badge,
+  Progress,
   Modal,
   ModalContent,
   ModalHeader,
   ModalBody,
   ModalFooter,
-  Input,
-  Textarea,
-  Chip,
-  Select,
-  SelectItem,
-  Spinner,
-  useDisclosure
-} from '@heroui/react'
+  BackgroundGradient,
+  ShimmerButton
+} from '../components/ui'
 
 const API_BASE = 'http://localhost:8000'
 
@@ -43,7 +35,7 @@ function DashboardPage() {
   const [error, setError] = useState('')
   
   // Modal state for tracking predictions
-  const { isOpen, onOpen, onClose } = useDisclosure()
+  const [isModalOpen, setIsModalOpen] = useState(false)
   const [selectedPrediction, setSelectedPrediction] = useState(null)
   const [stake, setStake] = useState("")
   const [notes, setNotes] = useState("")
@@ -100,7 +92,7 @@ function DashboardPage() {
     setSelectedPrediction(prediction)
     setStake("")
     setNotes("")
-    onOpen()
+    setIsModalOpen(true)
   }
 
   // Handle prediction tracking confirmation
@@ -126,7 +118,7 @@ function DashboardPage() {
       }
 
       await fetchDashboardStats()
-      onClose()
+      setIsModalOpen(false)
       // Could add toast notification here
     } catch (err) {
       alert(`Error tracking bet: ${err.message}`)
@@ -154,8 +146,8 @@ function DashboardPage() {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="flex flex-col items-center gap-4">
-          <Spinner size="lg" />
-          <p className="text-default-500">Loading dashboard...</p>
+          <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+          <p className="text-gray-400">Loading dashboard...</p>
         </div>
       </div>
     )
@@ -164,14 +156,14 @@ function DashboardPage() {
   if (error) {
     return (
       <div className="flex items-center justify-center min-h-screen">
-        <Card className="max-w-md">
-          <CardBody className="text-center">
-            <h2 className="text-2xl mb-2">⚠️ Error</h2>
-            <p className="text-default-500 mb-4">{error}</p>
-            <Button color="primary" onClick={() => window.location.reload()}>
+        <Card className="max-w-md bg-gray-900 border-gray-800">
+          <CardContent className="text-center">
+            <h2 className="text-2xl mb-2 text-white">⚠️ Error</h2>
+            <p className="text-gray-400 mb-4">{error}</p>
+            <Button variant="primary" onClick={() => window.location.reload()}>
               Retry
             </Button>
-          </CardBody>
+          </CardContent>
         </Card>
       </div>
     )
@@ -181,199 +173,193 @@ function DashboardPage() {
     <div className="p-6 max-w-7xl mx-auto space-y-6">
       {/* Page Header */}
       <div className="space-y-2">
-        <h1 className="text-3xl font-bold">Analytics Dashboard</h1>
-        <p className="text-default-500">Real-time performance tracking and AI-powered predictions</p>
+        <h1 className="text-3xl font-bold text-white">Analytics Dashboard</h1>
+        <p className="text-gray-400">Real-time performance tracking and AI-powered predictions</p>
       </div>
 
       {/* KPI Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        <Card>
+        <Card className="bg-gray-900 border-gray-800">
           <CardHeader className="pb-2">
-            <h3 className="text-lg font-semibold">Current Balance</h3>
+            <h3 className="text-lg font-semibold text-white">Current Balance</h3>
           </CardHeader>
-          <CardBody className="pt-0">
-            <p className="text-2xl font-bold text-primary">{formatCurrency(dashboardStats.current_balance)}</p>
-          </CardBody>
+          <CardContent className="pt-0">
+            <p className="text-2xl font-bold text-blue-400">{formatCurrency(dashboardStats.current_balance)}</p>
+          </CardContent>
         </Card>
 
-        <Card>
+        <Card className="bg-gray-900 border-gray-800">
           <CardHeader className="pb-2">
-            <h3 className="text-lg font-semibold">Total P/L</h3>
+            <h3 className="text-lg font-semibold text-white">Total P/L</h3>
           </CardHeader>
-          <CardBody className="pt-0">
-            <p className={`text-2xl font-bold ${dashboardStats.total_profit_loss >= 0 ? 'text-success' : 'text-danger'}`}>
+          <CardContent className="pt-0">
+            <p className={`text-2xl font-bold ${dashboardStats.total_profit_loss >= 0 ? 'text-green-400' : 'text-red-400'}`}>
               {formatCurrency(dashboardStats.total_profit_loss)}
             </p>
-          </CardBody>
+          </CardContent>
         </Card>
 
-        <Card>
+        <Card className="bg-gray-900 border-gray-800">
           <CardHeader className="pb-2">
-            <h3 className="text-lg font-semibold">ROI</h3>
+            <h3 className="text-lg font-semibold text-white">ROI</h3>
           </CardHeader>
-          <CardBody className="pt-0">
-            <p className={`text-2xl font-bold ${dashboardStats.roi >= 0 ? 'text-success' : 'text-danger'}`}>
+          <CardContent className="pt-0">
+            <p className={`text-2xl font-bold ${dashboardStats.roi >= 0 ? 'text-green-400' : 'text-red-400'}`}>
               {dashboardStats.roi.toFixed(1)}%
             </p>
-          </CardBody>
+          </CardContent>
         </Card>
 
-        <Card>
+        <Card className="bg-gray-900 border-gray-800">
           <CardHeader className="pb-2">
-            <h3 className="text-lg font-semibold">Win Rate</h3>
+            <h3 className="text-lg font-semibold text-white">Win Rate</h3>
           </CardHeader>
-          <CardBody className="pt-0">
-            <p className="text-2xl font-bold text-primary">{dashboardStats.win_rate.toFixed(1)}%</p>
-          </CardBody>
+          <CardContent className="pt-0">
+            <p className="text-2xl font-bold text-blue-400">{dashboardStats.win_rate.toFixed(1)}%</p>
+          </CardContent>
         </Card>
 
-        <Card>
+        <Card className="bg-gray-900 border-gray-800">
           <CardHeader className="pb-2">
-            <h3 className="text-lg font-semibold">Total Bets</h3>
+            <h3 className="text-lg font-semibold text-white">Total Bets</h3>
           </CardHeader>
-          <CardBody className="pt-0">
-            <p className="text-2xl font-bold">{dashboardStats.total_bets}</p>
-          </CardBody>
+          <CardContent className="pt-0">
+            <p className="text-2xl font-bold text-white">{dashboardStats.total_bets}</p>
+          </CardContent>
         </Card>
 
-        <Card>
+        <Card className="bg-gray-900 border-gray-800">
           <CardHeader className="pb-2">
-            <h3 className="text-lg font-semibold">Pending Bets</h3>
+            <h3 className="text-lg font-semibold text-white">Pending Bets</h3>
           </CardHeader>
-          <CardBody className="pt-0">
-            <p className="text-2xl font-bold text-warning">{dashboardStats.pending_bets}</p>
-          </CardBody>
+          <CardContent className="pt-0">
+            <p className="text-2xl font-bold text-yellow-400">{dashboardStats.pending_bets}</p>
+          </CardContent>
         </Card>
       </div>
 
       {/* Predictions Section */}
-      <Card>
+      <Card className="bg-gray-900 border-gray-800">
         <CardHeader className="flex justify-between items-center">
           <div>
-            <h2 className="text-2xl font-bold">🤖 AI Predictions</h2>
-            <p className="text-default-500">{filteredPredictions.length} predictions available</p>
+            <h2 className="text-2xl font-bold text-white">🤖 AI Predictions</h2>
+            <p className="text-gray-400">{filteredPredictions.length} predictions available</p>
           </div>
-          <Select
-            label="Filter by Sport"
-            placeholder="All Sports"
-            selectedKeys={[filterSport]}
-            onSelectionChange={(keys) => setFilterSport(Array.from(keys)[0] || "all")}
-            className="w-48"
+          <select
+            value={filterSport}
+            onChange={(e) => setFilterSport(e.target.value)}
+            className="px-4 py-2 bg-gray-800 border border-gray-700 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
           >
-            <SelectItem key="all" value="all">All Sports</SelectItem>
-            <SelectItem key="NBA" value="NBA">NBA</SelectItem>
-            <SelectItem key="NFL" value="NFL">NFL</SelectItem>
-          </Select>
+            <option value="all">All Sports</option>
+            <option value="NBA">NBA</option>
+            <option value="NFL">NFL</option>
+          </select>
         </CardHeader>
-        <CardBody>
-          <Table aria-label="AI Predictions Table">
-            <TableHeader>
-              <TableColumn>MATCHUP</TableColumn>
-              <TableColumn>PREDICTION</TableColumn>
-              <TableColumn>ODDS</TableColumn>
-              <TableColumn>CONFIDENCE</TableColumn>
-              <TableColumn>ACTIONS</TableColumn>
-            </TableHeader>
-            <TableBody>
-              {filteredPredictions.map((prediction) => (
-                <TableRow key={prediction.prediction_id}>
-                  <TableCell>
-                    <div className="flex flex-col">
-                      <p className="font-semibold">{prediction.matchup}</p>
-                      <p className="text-small text-default-500">{prediction.sport} • {prediction.game_date}</p>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <Chip color="primary" variant="flat">
+        <CardContent>
+          <div className="space-y-4">
+            {filteredPredictions.map((prediction) => (
+              <BackgroundGradient 
+                key={prediction.prediction_id}
+                className="rounded-2xl bg-gray-800 p-6"
+                containerClassName="rounded-2xl"
+              >
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-center">
+                  {/* Matchup */}
+                  <div className="flex flex-col">
+                    <p className="font-semibold text-white text-lg">{prediction.matchup}</p>
+                    <p className="text-sm text-gray-400">{prediction.sport} • {prediction.game_date}</p>
+                  </div>
+                  
+                  {/* Prediction */}
+                  <div className="flex flex-col items-center">
+                    <Badge variant="primary" className="mb-2">
                       {prediction.predicted_pick}
-                    </Chip>
-                  </TableCell>
-                  <TableCell>
-                    <span className="font-mono">{prediction.predicted_odds > 0 ? '+' : ''}{prediction.predicted_odds}</span>
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex flex-col gap-1">
-                      <Progress
-                        value={prediction.confidence_score}
-                        color={getConfidenceColor(prediction.confidence_score)}
-                        className="w-20"
-                        size="sm"
-                      />
-                      <span className="text-small">{prediction.confidence_score.toFixed(1)}%</span>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <Button
-                      color="primary"
-                      size="sm"
-                      onPress={() => handleTrackPrediction(prediction)}
+                    </Badge>
+                    <span className="font-mono text-white text-lg">
+                      {prediction.predicted_odds > 0 ? '+' : ''}{prediction.predicted_odds}
+                    </span>
+                  </div>
+                  
+                  {/* Confidence */}
+                  <div className="flex flex-col items-center">
+                    <Progress
+                      value={prediction.confidence_score}
+                      color={getConfidenceColor(prediction.confidence_score)}
+                      className="w-24 mb-2"
+                    />
+                    <span className="text-sm text-gray-300">{prediction.confidence_score.toFixed(1)}%</span>
+                  </div>
+                  
+                  {/* Action */}
+                  <div className="flex justify-center">
+                    <ShimmerButton
+                      onClick={() => handleTrackPrediction(prediction)}
+                      className="px-6 py-2"
                     >
-                      Track
-                    </Button>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </CardBody>
+                      Track Bet
+                    </ShimmerButton>
+                  </div>
+                </div>
+              </BackgroundGradient>
+            ))}
+          </div>
+        </CardContent>
       </Card>
 
       {/* Track Prediction Modal */}
-      <Modal isOpen={isOpen} onClose={onClose} size="md">
-        <ModalContent>
-          {(onClose) => (
-            <>
-              <ModalHeader>
-                <h3>Track Prediction</h3>
-              </ModalHeader>
-              <ModalBody>
-                {selectedPrediction && (
-                  <div className="space-y-4">
-                    <div className="p-4 bg-default-100 rounded-lg">
-                      <p className="font-semibold">{selectedPrediction.matchup}</p>
-                      <p className="text-default-600">{selectedPrediction.predicted_pick}</p>
-                      <p className="text-small text-default-500">
-                        {selectedPrediction.predicted_odds > 0 ? '+' : ''}{selectedPrediction.predicted_odds} odds
-                        • {selectedPrediction.confidence_score.toFixed(1)}% confidence
-                      </p>
-                    </div>
-                    
-                    <Input
-                      label="Stake Amount"
-                      placeholder="Enter stake amount"
-                      startContent="$"
-                      value={stake}
-                      onChange={(e) => setStake(e.target.value)}
-                      type="number"
-                      step="0.01"
-                      min="0"
-                    />
-                    
-                    <Textarea
-                      label="Notes (optional)"
-                      placeholder="Add any notes about this bet..."
-                      value={notes}
-                      onChange={(e) => setNotes(e.target.value)}
-                      maxRows={3}
-                    />
-                  </div>
-                )}
-              </ModalBody>
-              <ModalFooter>
-                <Button color="danger" variant="light" onPress={onClose}>
-                  Cancel
-                </Button>
-                <Button
-                  color="primary"
-                  onPress={handleTrackingConfirm}
-                  isLoading={trackingLoading}
-                  isDisabled={!stake || parseFloat(stake) <= 0}
-                >
-                  Track Bet
-                </Button>
-              </ModalFooter>
-            </>
-          )}
+      <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} size="md">
+        <ModalContent className="bg-gray-900 border-gray-800">
+          <ModalHeader>
+            <h3 className="text-white">Track Prediction</h3>
+          </ModalHeader>
+          <ModalBody>
+            {selectedPrediction && (
+              <div className="space-y-4">
+                <div className="p-4 bg-gray-800 rounded-lg">
+                  <p className="font-semibold text-white">{selectedPrediction.matchup}</p>
+                  <p className="text-gray-300">{selectedPrediction.predicted_pick}</p>
+                  <p className="text-sm text-gray-400">
+                    {selectedPrediction.predicted_odds > 0 ? '+' : ''}{selectedPrediction.predicted_odds} odds
+                    • {selectedPrediction.confidence_score.toFixed(1)}% confidence
+                  </p>
+                </div>
+                
+                <Input
+                  label="Stake Amount"
+                  placeholder="Enter stake amount"
+                  startContent="$"
+                  value={stake}
+                  onChange={(e) => setStake(e.target.value)}
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  className="bg-gray-800 border-gray-700"
+                />
+                
+                <Textarea
+                  label="Notes (optional)"
+                  placeholder="Add any notes about this bet..."
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                  className="bg-gray-800 border-gray-700"
+                  rows={3}
+                />
+              </div>
+            )}
+          </ModalBody>
+          <ModalFooter>
+            <Button variant="outline" onClick={() => setIsModalOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              variant="primary"
+              onClick={handleTrackingConfirm}
+              loading={trackingLoading}
+              disabled={!stake || parseFloat(stake) <= 0}
+            >
+              Track Bet
+            </Button>
+          </ModalFooter>
         </ModalContent>
       </Modal>
     </div>

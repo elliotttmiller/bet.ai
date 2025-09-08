@@ -1,15 +1,14 @@
 import { useState, useRef, useEffect } from 'react'
 import { 
   Card, 
-  CardBody, 
-  CardHeader,
-  Input,
+  CardHeader, 
+  CardContent,
   Button,
-  Avatar,
-  Divider,
-  Chip,
-  Snippet
-} from '@heroui/react'
+  Input,
+  Badge,
+  TextGenerateEffect,
+  ShimmerButton
+} from '../components/ui'
 
 const API_BASE = 'http://localhost:8000'
 
@@ -24,6 +23,7 @@ function ChatPage() {
   ])
   const [inputMessage, setInputMessage] = useState('')
   const [isLoading, setIsLoading] = useState(false)
+  const [currentAiMessage, setCurrentAiMessage] = useState('')
 
   const messagesEndRef = useRef(null)
   const inputRef = useRef(null)
@@ -31,7 +31,7 @@ function ChatPage() {
   // Auto-scroll to bottom when new messages are added
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages])
+  }, [messages, currentAiMessage])
 
   // Focus input on mount
   useEffect(() => {
@@ -54,6 +54,7 @@ function ChatPage() {
     setMessages(prev => [...prev, userMessage])
     setInputMessage('')
     setIsLoading(true)
+    setCurrentAiMessage('')
 
     try {
       const response = await fetch(`${API_BASE}/api/betai/query`, {
@@ -66,15 +67,21 @@ function ChatPage() {
       
       const data = await response.json()
 
-      // Add AI response
-      const aiMessage = {
-        id: Date.now() + 1,
-        type: 'ai',
-        content: data.response,
-        timestamp: new Date()
-      }
+      // Set the AI message for TextGenerateEffect
+      setCurrentAiMessage(data.response)
 
-      setMessages(prev => [...prev, aiMessage])
+      // Add AI response to messages after a delay to allow animation to start
+      setTimeout(() => {
+        const aiMessage = {
+          id: Date.now() + 1,
+          type: 'ai',
+          content: data.response,
+          timestamp: new Date(),
+          isAnimating: false
+        }
+        setMessages(prev => [...prev, aiMessage])
+        setCurrentAiMessage('')
+      }, data.response.split(' ').length * 100 + 500) // Delay based on message length
 
     } catch (err) {
       console.error('Chat error:', err)
@@ -87,6 +94,7 @@ function ChatPage() {
         timestamp: new Date()
       }
       setMessages(prev => [...prev, errorMessage])
+      setCurrentAiMessage('')
     } finally {
       setIsLoading(false)
     }
@@ -108,6 +116,7 @@ function ChatPage() {
         timestamp: new Date()
       }
     ])
+    setCurrentAiMessage('')
   }
 
   return (
@@ -115,58 +124,47 @@ function ChatPage() {
       {/* Chat Header */}
       <div className="flex justify-between items-start mb-6">
         <div className="space-y-2">
-          <h1 className="text-3xl font-bold flex items-center gap-2">
+          <h1 className="text-3xl font-bold flex items-center gap-2 text-white">
             🤖 BetAI Chat
           </h1>
-          <p className="text-default-500">Your AI-powered sports betting analyst</p>
+          <p className="text-gray-400">Your AI-powered sports betting analyst</p>
         </div>
         <Button
-          color="danger"
-          variant="light"
-          onPress={clearChat}
-          startContent={<span>🗑️</span>}
+          variant="danger"
+          onClick={clearChat}
         >
-          Clear Chat
+          🗑️ Clear Chat
         </Button>
       </div>
 
       {/* Messages Card */}
-      <Card className="mb-6">
+      <Card className="mb-6 bg-gray-900 border-gray-800">
         <CardHeader>
-          <h2 className="text-xl font-semibold">Chat History</h2>
+          <h2 className="text-xl font-semibold text-white">Chat History</h2>
         </CardHeader>
-        <CardBody>
+        <CardContent>
           <div className="space-y-4 max-h-96 overflow-y-auto">
             {messages.map((message, index) => (
               <div key={message.id}>
                 <div className={`flex gap-3 ${message.type === 'user' ? 'flex-row-reverse' : ''}`}>
-                  <Avatar
-                    icon={
-                      message.type === 'user' ? '👤' : 
-                      message.type === 'error' ? '⚠️' : '🤖'
-                    }
-                    className="flex-shrink-0"
-                    size="sm"
-                    color={message.type === 'user' ? 'primary' : message.type === 'error' ? 'danger' : 'success'}
-                  />
+                  <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-sm ${
+                    message.type === 'user' ? 'bg-blue-500 text-white' : 
+                    message.type === 'error' ? 'bg-red-500 text-white' : 'bg-green-500 text-white'
+                  }`}>
+                    {message.type === 'user' ? '👤' : message.type === 'error' ? '⚠️' : '🤖'}
+                  </div>
                   
                   <div className={`flex-1 max-w-[80%] ${message.type === 'user' ? 'text-right' : ''}`}>
                     <div className={`p-3 rounded-lg ${
                       message.type === 'user' 
-                        ? 'bg-primary text-primary-foreground ml-auto' 
+                        ? 'bg-blue-600 text-white ml-auto' 
                         : message.type === 'error'
-                        ? 'bg-danger-50 text-danger' 
-                        : 'bg-default-100'
+                        ? 'bg-red-800 text-red-200' 
+                        : 'bg-gray-800 text-gray-100'
                     }`}>
-                      {message.type === 'ai' && message.content.length > 100 ? (
-                        <Snippet className="w-full">
-                          <pre className="whitespace-pre-wrap text-sm">{message.content}</pre>
-                        </Snippet>
-                      ) : (
-                        <p className="text-sm whitespace-pre-wrap">{message.content}</p>
-                      )}
+                      <p className="text-sm whitespace-pre-wrap">{message.content}</p>
                     </div>
-                    <div className={`text-xs text-default-400 mt-1 ${
+                    <div className={`text-xs text-gray-500 mt-1 ${
                       message.type === 'user' ? 'text-right' : ''
                     }`}>
                       {formatTime(message.timestamp)}
@@ -174,27 +172,41 @@ function ChatPage() {
                   </div>
                 </div>
                 
-                {index < messages.length - 1 && <Divider className="my-2" />}
+                {index < messages.length - 1 && <div className="border-t border-gray-800 my-2" />}
               </div>
             ))}
 
-            {isLoading && (
+            {/* Animating AI response */}
+            {currentAiMessage && (
               <div className="flex gap-3">
-                <Avatar
-                  icon="🤖"
-                  className="flex-shrink-0"
-                  size="sm"
-                  color="success"
-                />
+                <div className="flex-shrink-0 w-8 h-8 rounded-full bg-green-500 text-white flex items-center justify-center text-sm">
+                  🤖
+                </div>
                 <div className="flex-1">
-                  <div className="p-3 rounded-lg bg-default-100">
+                  <div className="p-3 rounded-lg bg-gray-800 text-gray-100">
+                    <TextGenerateEffect
+                      words={currentAiMessage}
+                      className="text-sm whitespace-pre-wrap"
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {isLoading && !currentAiMessage && (
+              <div className="flex gap-3">
+                <div className="flex-shrink-0 w-8 h-8 rounded-full bg-green-500 text-white flex items-center justify-center text-sm">
+                  🤖
+                </div>
+                <div className="flex-1">
+                  <div className="p-3 rounded-lg bg-gray-800">
                     <div className="flex items-center gap-2">
                       <div className="flex gap-1">
-                        <div className="w-2 h-2 bg-default-400 rounded-full animate-pulse"></div>
-                        <div className="w-2 h-2 bg-default-400 rounded-full animate-pulse delay-150"></div>
-                        <div className="w-2 h-2 bg-default-400 rounded-full animate-pulse delay-300"></div>
+                        <div className="w-2 h-2 bg-gray-400 rounded-full animate-pulse"></div>
+                        <div className="w-2 h-2 bg-gray-400 rounded-full animate-pulse delay-150"></div>
+                        <div className="w-2 h-2 bg-gray-400 rounded-full animate-pulse delay-300"></div>
                       </div>
-                      <span className="text-sm text-default-500">BetAI is thinking...</span>
+                      <span className="text-sm text-gray-400">BetAI is thinking...</span>
                     </div>
                   </div>
                 </div>
@@ -203,12 +215,12 @@ function ChatPage() {
 
             <div ref={messagesEndRef} />
           </div>
-        </CardBody>
+        </CardContent>
       </Card>
 
       {/* Input Area */}
-      <Card>
-        <CardBody>
+      <Card className="bg-gray-900 border-gray-800">
+        <CardContent>
           <form onSubmit={sendMessage} className="flex gap-3">
             <Input
               ref={inputRef}
@@ -216,28 +228,26 @@ function ChatPage() {
               value={inputMessage}
               onChange={(e) => setInputMessage(e.target.value)}
               disabled={isLoading}
-              maxLength={1000}
-              className="flex-1"
+              className="flex-1 bg-gray-800 border-gray-700 text-white placeholder-gray-400"
               endContent={
-                <Chip size="sm" variant="flat" color="default">
+                <Badge variant="secondary">
                   {inputMessage.length}/1000
-                </Chip>
+                </Badge>
               }
             />
-            <Button
+            <ShimmerButton
               type="submit"
-              color="primary"
-              isLoading={isLoading}
-              isDisabled={!inputMessage.trim() || isLoading}
+              disabled={!inputMessage.trim() || isLoading}
               className="px-6"
+              loading={isLoading}
             >
               Send
-            </Button>
+            </ShimmerButton>
           </form>
-          <p className="text-xs text-default-400 mt-2">
+          <p className="text-xs text-gray-400 mt-2">
             Press Enter to send your message to BetAI
           </p>
-        </CardBody>
+        </CardContent>
       </Card>
     </div>
   )
