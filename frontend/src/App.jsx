@@ -1,4 +1,5 @@
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom'
+import { HeroUIProvider } from '@heroui/react'
 import Navbar from './components/Navbar'
 import DashboardPage from './pages/DashboardPage'
 import ChatPage from './pages/ChatPage'
@@ -6,7 +7,7 @@ import './App.css'
 
 function App() {
   return (
-    <div className="dark">
+    <HeroUIProvider theme={{ type: "dark" }}>
       <Router>
         <div className="app min-h-screen bg-background text-foreground">
           <Navbar />
@@ -18,7 +19,7 @@ function App() {
           </main>
         </div>
       </Router>
-    </div>
+    </HeroUIProvider>
   )
 }
 
