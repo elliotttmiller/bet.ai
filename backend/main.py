@@ -288,7 +288,7 @@ async def settle_bet(bet_id: int, settle: BetSettle):
 
 @app.get("/api/predictions", response_model=List[PredictionResponse])
 async def get_predictions(limit: int = 10):
-    """Get AI predictions."""
+    """Get AI-generated ML predictions."""
     with get_db() as conn:
         cursor = conn.cursor()
         cursor.execute("""
@@ -298,6 +298,27 @@ async def get_predictions(limit: int = 10):
         """, (limit,))
         
         rows = cursor.fetchall()
+        if not rows:
+            # If no predictions exist, generate some
+            print("No predictions found, running model trainer...")
+            try:
+                from pathlib import Path
+                import subprocess
+                import sys
+                
+                model_trainer_path = Path(__file__).parent / "model_trainer.py"
+                subprocess.run([sys.executable, str(model_trainer_path)], check=True)
+                
+                # Try fetching again
+                cursor.execute("""
+                    SELECT * FROM predictions 
+                    ORDER BY created_at DESC 
+                    LIMIT ?
+                """, (limit,))
+                rows = cursor.fetchall()
+            except Exception as e:
+                print(f"Error running model trainer: {e}")
+        
         return [PredictionResponse(**dict(row)) for row in rows]
 
 @app.post("/api/betai/query")

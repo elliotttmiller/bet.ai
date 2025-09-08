@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import KPIBar from '../components/KPIBar'
 import FilterControls from '../components/FilterControls'
-import PredictionCard from '../components/PredictionCard'
+import PredictionRow from '../components/PredictionRow'
 import BetModal from '../components/BetModal'
 import './DashboardPage.css'
 
@@ -175,10 +175,10 @@ function DashboardPage() {
         {/* Filter Controls */}
         <FilterControls onFilterChange={handleFilterChange} />
 
-        {/* Predictions Grid */}
+        {/* Predictions Section */}
         <div className="predictions-section">
           <div className="section-header">
-            <h2>🎯 AI Predictions</h2>
+            <h2>🤖 ML Predictions</h2>
             <span className="predictions-count">
               {filteredPredictions.length} prediction{filteredPredictions.length !== 1 ? 's' : ''}
             </span>
@@ -187,12 +187,12 @@ function DashboardPage() {
           {filteredPredictions.length === 0 ? (
             <div className="empty-state">
               <h3>No predictions found</h3>
-              <p>Try adjusting your filters or check back later for new predictions.</p>
+              <p>Try adjusting your filters or check back later for new ML predictions.</p>
             </div>
           ) : (
-            <div className="predictions-grid">
+            <div className="predictions-list">
               {filteredPredictions.map((prediction) => (
-                <PredictionCard
+                <PredictionRow
                   key={prediction.prediction_id}
                   prediction={prediction}
                   onLogBet={handleLogBet}

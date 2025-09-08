@@ -50,7 +50,53 @@ def create_database():
         )
     """)
     
-    # Create predictions table (for future AI predictions)
+    # Create teams table for ML model data
+    cursor.execute("""
+        CREATE TABLE teams (
+            team_id INTEGER PRIMARY KEY AUTOINCREMENT,
+            team_name TEXT NOT NULL UNIQUE,
+            sport TEXT NOT NULL,
+            league TEXT NOT NULL,
+            created_at TEXT NOT NULL
+        )
+    """)
+    
+    # Create games table for historical data
+    cursor.execute("""
+        CREATE TABLE games (
+            game_id INTEGER PRIMARY KEY AUTOINCREMENT,
+            external_id TEXT UNIQUE,
+            sport TEXT NOT NULL,
+            league TEXT NOT NULL,
+            game_date TEXT NOT NULL,
+            home_team_id INTEGER NOT NULL,
+            away_team_id INTEGER NOT NULL,
+            home_score INTEGER,
+            away_score INTEGER,
+            status TEXT NOT NULL DEFAULT 'scheduled',
+            created_at TEXT NOT NULL,
+            FOREIGN KEY (home_team_id) REFERENCES teams (team_id),
+            FOREIGN KEY (away_team_id) REFERENCES teams (team_id),
+            CONSTRAINT valid_status CHECK (status IN ('scheduled', 'completed', 'postponed', 'cancelled'))
+        )
+    """)
+    
+    # Create historical_stats table for team performance metrics
+    cursor.execute("""
+        CREATE TABLE historical_stats (
+            stat_id INTEGER PRIMARY KEY AUTOINCREMENT,
+            team_id INTEGER NOT NULL,
+            games_played INTEGER NOT NULL DEFAULT 0,
+            wins INTEGER NOT NULL DEFAULT 0,
+            losses INTEGER NOT NULL DEFAULT 0,
+            points_scored INTEGER NOT NULL DEFAULT 0,
+            points_allowed INTEGER NOT NULL DEFAULT 0,
+            last_updated TEXT NOT NULL,
+            FOREIGN KEY (team_id) REFERENCES teams (team_id)
+        )
+    """)
+
+    # Create predictions table (for ML-generated AI predictions)
     cursor.execute("""
         CREATE TABLE predictions (
             prediction_id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -66,6 +112,7 @@ def create_database():
             projected_score TEXT,
             calculated_edge REAL,
             created_at TEXT NOT NULL,
+            model_version TEXT DEFAULT 'v1.0',
             CONSTRAINT valid_confidence CHECK (confidence_score >= 0 AND confidence_score <= 100)
         )
     """)
@@ -75,20 +122,6 @@ def create_database():
         INSERT INTO ledger (timestamp, transaction_type, amount, running_balance, description)
         VALUES (datetime('now'), 'Initial', 1000.0, 1000.0, 'Initial bankroll deposit')
     """)
-    
-    # Insert sample predictions for demo
-    sample_predictions = [
-        ('Lakers vs Warriors', 'NBA', 'NBA', '2024-01-15 20:00:00', 'Los Angeles Lakers', 'Golden State Warriors', 'Lakers -5.5', -110, 78.5, 'Lakers 112, Warriors 105', 3.2),
-        ('Chiefs vs Bills', 'NFL', 'NFL', '2024-01-14 16:00:00', 'Kansas City Chiefs', 'Buffalo Bills', 'Over 48.5', -105, 82.3, 'Chiefs 28, Bills 24', 4.1),
-        ('Celtics vs Heat', 'NBA', 'NBA', '2024-01-16 19:30:00', 'Boston Celtics', 'Miami Heat', 'Celtics ML', 150, 65.7, 'Celtics 108, Heat 102', 2.8),
-        ('Cowboys vs Eagles', 'NFL', 'NFL', '2024-01-14 13:00:00', 'Dallas Cowboys', 'Philadelphia Eagles', 'Eagles -3', -115, 71.2, 'Eagles 21, Cowboys 17', 3.5),
-        ('Nuggets vs Suns', 'NBA', 'NBA', '2024-01-17 22:00:00', 'Denver Nuggets', 'Phoenix Suns', 'Under 225.5', -110, 74.9, 'Nuggets 110, Suns 108', 2.9)
-    ]
-    
-    cursor.executemany("""
-        INSERT INTO predictions (matchup, sport, league, game_date, team_a, team_b, predicted_pick, predicted_odds, confidence_score, projected_score, calculated_edge, created_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
-    """, sample_predictions)
     
     conn.commit()
     conn.close()
