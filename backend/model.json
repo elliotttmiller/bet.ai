@@ -1,0 +1,12 @@
+{
+  "model_version": "v1.0-stats",
+  "weights": {
+    "win_rate_home": 0.35,
+    "win_rate_away": 0.35,
+    "home_advantage": 0.15,
+    "point_differential_home": 0.075,
+    "point_differential_away": 0.075
+  },
+  "home_advantage_boost": 0.05,
+  "trained_at": "2025-09-08T06:39:17.246668"
+}
