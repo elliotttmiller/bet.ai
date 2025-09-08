@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import KPIBar from '../components/KPIBar'
 import FilterControls from '../components/FilterControls'
 import PredictionRow from '../components/PredictionRow'
-import BetModal from '../components/BetModal'
+import TrackPredictionModal from '../components/TrackPredictionModal'
 import './DashboardPage.css'
 
 const API_BASE = 'http://localhost:8000'
@@ -98,29 +98,29 @@ function DashboardPage() {
     setFilters(newFilters)
   }
 
-  // Handle log bet
-  const handleLogBet = (prediction) => {
+  // Handle track prediction
+  const handleTrackPrediction = (prediction) => {
     setSelectedPrediction(prediction)
     setIsModalOpen(true)
   }
 
-  // Handle bet confirmation
-  const handleBetConfirm = async (betData) => {
+  // Handle prediction tracking confirmation
+  const handleTrackingConfirm = async (trackingData) => {
     try {
       const response = await fetch(`${API_BASE}/api/bets`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify(betData)
+        body: JSON.stringify(trackingData)
       })
 
       if (!response.ok) {
         const errorData = await response.json()
-        throw new Error(errorData.detail || 'Failed to place bet')
+        throw new Error(errorData.detail || 'Failed to track prediction')
       }
 
-      // Refresh dashboard stats after successful bet
+      // Refresh dashboard stats after successful tracking
       await fetchDashboardStats()
       
       // Close modal
@@ -128,7 +128,7 @@ function DashboardPage() {
       setSelectedPrediction(null)
       
       // Show success message
-      alert('✅ Bet placed successfully!')
+      alert('✅ Prediction tracked successfully!')
       
     } catch (err) {
       throw err // Re-throw to be handled by modal
@@ -165,8 +165,8 @@ function DashboardPage() {
       <div className="dashboard-container">
         {/* Page Header */}
         <div className="page-header">
-          <h1>Dashboard</h1>
-          <p>Real-time betting performance and AI predictions</p>
+          <h1>Analytics Dashboard</h1>
+          <p>Real-time performance tracking and AI-powered predictions</p>
         </div>
 
         {/* KPI Bar */}
@@ -178,7 +178,7 @@ function DashboardPage() {
         {/* Predictions Section */}
         <div className="predictions-section">
           <div className="section-header">
-            <h2>🤖 ML Predictions</h2>
+            <h2>🤖 AI Predictions</h2>
             <span className="predictions-count">
               {filteredPredictions.length} prediction{filteredPredictions.length !== 1 ? 's' : ''}
             </span>
@@ -187,7 +187,7 @@ function DashboardPage() {
           {filteredPredictions.length === 0 ? (
             <div className="empty-state">
               <h3>No predictions found</h3>
-              <p>Try adjusting your filters or check back later for new ML predictions.</p>
+              <p>Try adjusting your filters or check back later for new AI predictions.</p>
             </div>
           ) : (
             <div className="predictions-list">
@@ -195,22 +195,22 @@ function DashboardPage() {
                 <PredictionRow
                   key={prediction.prediction_id}
                   prediction={prediction}
-                  onLogBet={handleLogBet}
+                  onTrackPrediction={handleTrackPrediction}
                 />
               ))}
             </div>
           )}
         </div>
 
-        {/* Bet Modal */}
-        <BetModal
+        {/* Track Prediction Modal */}
+        <TrackPredictionModal
           isOpen={isModalOpen}
           onClose={() => {
             setIsModalOpen(false)
             setSelectedPrediction(null)
           }}
           prediction={selectedPrediction}
-          onConfirm={handleBetConfirm}
+          onConfirm={handleTrackingConfirm}
         />
       </div>
     </div>
