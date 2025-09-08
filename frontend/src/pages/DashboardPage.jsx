@@ -2,7 +2,8 @@ import { useState, useEffect } from 'react'
 import KPIBar from '../components/KPIBar'
 import FilterControls from '../components/FilterControls'
 import PredictionRow from '../components/PredictionRow'
-import BetModal from '../components/BetModal'
+import TrackPredictionModal from '../components/TrackPredictionModal'
+import { apiClient, ApiError } from '../lib/api-client'
 import './DashboardPage.css'
 
 const API_BASE = 'http://localhost:8000'
@@ -26,29 +27,33 @@ function DashboardPage() {
   const [selectedPrediction, setSelectedPrediction] = useState(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
 
-  // Fetch dashboard data
+  // Fetch dashboard data using type-safe client
   const fetchDashboardStats = async () => {
     try {
-      const response = await fetch(`${API_BASE}/api/dashboard/stats`)
-      if (!response.ok) throw new Error('Failed to fetch dashboard stats')
-      const data = await response.json()
+      const data = await apiClient.getDashboardStats()
       setDashboardStats(data)
     } catch (err) {
-      setError('Failed to load dashboard statistics')
+      if (err instanceof ApiError) {
+        setError(`Failed to load dashboard statistics: ${err.message}`)
+      } else {
+        setError('Failed to load dashboard statistics')
+      }
       console.error('Dashboard stats error:', err)
     }
   }
 
-  // Fetch predictions
+  // Fetch predictions using type-safe client
   const fetchPredictions = async () => {
     try {
-      const response = await fetch(`${API_BASE}/api/predictions`)
-      if (!response.ok) throw new Error('Failed to fetch predictions')
-      const data = await response.json()
+      const data = await apiClient.getPredictions()
       setPredictions(data)
       setFilteredPredictions(data)
     } catch (err) {
-      setError('Failed to load predictions')
+      if (err instanceof ApiError) {
+        setError(`Failed to load predictions: ${err.message}`)
+      } else {
+        setError('Failed to load predictions')
+      }
       console.error('Predictions error:', err)
     }
   }
@@ -98,29 +103,18 @@ function DashboardPage() {
     setFilters(newFilters)
   }
 
-  // Handle log bet
-  const handleLogBet = (prediction) => {
+  // Handle track prediction
+  const handleTrackPrediction = (prediction) => {
     setSelectedPrediction(prediction)
     setIsModalOpen(true)
   }
 
-  // Handle bet confirmation
-  const handleBetConfirm = async (betData) => {
+  // Handle prediction tracking confirmation using type-safe client
+  const handleTrackingConfirm = async (trackingData) => {
     try {
-      const response = await fetch(`${API_BASE}/api/bets`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(betData)
-      })
+      await apiClient.trackPrediction(trackingData)
 
-      if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.detail || 'Failed to place bet')
-      }
-
-      // Refresh dashboard stats after successful bet
+      // Refresh dashboard stats after successful tracking
       await fetchDashboardStats()
       
       // Close modal
@@ -128,9 +122,12 @@ function DashboardPage() {
       setSelectedPrediction(null)
       
       // Show success message
-      alert('✅ Bet placed successfully!')
+      alert('✅ Prediction tracked successfully!')
       
     } catch (err) {
+      if (err instanceof ApiError) {
+        throw new Error(err.message)
+      }
       throw err // Re-throw to be handled by modal
     }
   }
@@ -165,8 +162,8 @@ function DashboardPage() {
       <div className="dashboard-container">
         {/* Page Header */}
         <div className="page-header">
-          <h1>Dashboard</h1>
-          <p>Real-time betting performance and AI predictions</p>
+          <h1>Analytics Dashboard</h1>
+          <p>Real-time performance tracking and AI-powered predictions</p>
         </div>
 
         {/* KPI Bar */}
@@ -178,7 +175,7 @@ function DashboardPage() {
         {/* Predictions Section */}
         <div className="predictions-section">
           <div className="section-header">
-            <h2>🤖 ML Predictions</h2>
+            <h2>🤖 AI Predictions</h2>
             <span className="predictions-count">
               {filteredPredictions.length} prediction{filteredPredictions.length !== 1 ? 's' : ''}
             </span>
@@ -187,30 +184,31 @@ function DashboardPage() {
           {filteredPredictions.length === 0 ? (
             <div className="empty-state">
               <h3>No predictions found</h3>
-              <p>Try adjusting your filters or check back later for new ML predictions.</p>
+              <p>Try adjusting your filters or check back later for new AI predictions.</p>
             </div>
           ) : (
             <div className="predictions-list">
-              {filteredPredictions.map((prediction) => (
-                <PredictionRow
-                  key={prediction.prediction_id}
-                  prediction={prediction}
-                  onLogBet={handleLogBet}
-                />
+              {filteredPredictions.map((prediction, index) => (
+                <div key={prediction.prediction_id} className="stagger-fade-in" style={{ animationDelay: `${index * 0.1}s` }}>
+                  <PredictionRow
+                    prediction={prediction}
+                    onTrackPrediction={handleTrackPrediction}
+                  />
+                </div>
               ))}
             </div>
           )}
         </div>
 
-        {/* Bet Modal */}
-        <BetModal
+        {/* Track Prediction Modal */}
+        <TrackPredictionModal
           isOpen={isModalOpen}
           onClose={() => {
             setIsModalOpen(false)
             setSelectedPrediction(null)
           }}
           prediction={selectedPrediction}
-          onConfirm={handleBetConfirm}
+          onConfirm={handleTrackingConfirm}
         />
       </div>
     </div>

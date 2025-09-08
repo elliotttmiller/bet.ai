@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
+import { apiClient, ApiError } from '../lib/api-client'
 import './ChatPage.css'
 
 const API_BASE = 'http://localhost:8000'
@@ -48,21 +49,9 @@ function ChatPage() {
     setError('')
 
     try {
-      const response = await fetch(`${API_BASE}/api/betai/query`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          message: userMessage.content
-        })
+      const data = await apiClient.betaiQuery({
+        message: userMessage.content
       })
-
-      if (!response.ok) {
-        throw new Error('Failed to get response from BetAI')
-      }
-
-      const data = await response.json()
 
       // Add AI response
       const aiMessage = {
@@ -75,7 +64,11 @@ function ChatPage() {
       setMessages(prev => [...prev, aiMessage])
 
     } catch (err) {
-      setError('Failed to connect to BetAI. Please ensure LM Studio is running on localhost:1234')
+      if (err instanceof ApiError) {
+        setError(`Failed to connect to BetAI: ${err.message}`)
+      } else {
+        setError('Failed to connect to BetAI. Please ensure LM Studio is running on localhost:1234')
+      }
       console.error('Chat error:', err)
       
       // Add error message to chat
