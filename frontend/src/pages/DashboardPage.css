@@ -1,6 +1,7 @@
 .dashboard-page {
   min-height: 100vh;
-  background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+  background: linear-gradient(135deg, #000000 0%, #1a1a1a 100%);
+  color: #ffffff;
 }
 
 .dashboard-container {
@@ -17,9 +18,9 @@
 .page-header h1 {
   font-size: 3rem;
   font-weight: 800;
-  color: #1e293b;
+  color: #ffffff;
   margin: 0 0 0.5rem 0;
-  background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+  background: linear-gradient(135deg, #4299e1 0%, #3182ce 100%);
   background-clip: text;
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
@@ -27,7 +28,7 @@
 
 .page-header p {
   font-size: 1.125rem;
-  color: #64748b;
+  color: #a0aec0;
   margin: 0;
 }
 
@@ -95,51 +96,50 @@
 .section-header h2 {
   font-size: 1.5rem;
   font-weight: 700;
-  color: #1e293b;
+  color: #ffffff;
   margin: 0;
 }
 
 .predictions-count {
   font-size: 0.875rem;
-  color: #64748b;
-  background: white;
+  color: #a0aec0;
+  background: #2d3748;
   padding: 0.5rem 1rem;
   border-radius: 20px;
-  border: 1px solid #e5e7eb;
+  border: 1px solid #4a5568;
   font-weight: 500;
 }
 
-.predictions-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
-  gap: 2rem;
-  align-items: start;
+/* Change from grid to vertical list */
+.predictions-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
 }
 
 .empty-state {
-  background: white;
+  background: #1a1a1a;
   border-radius: 16px;
   padding: 4rem 2rem;
   text-align: center;
-  border: 2px dashed #e5e7eb;
+  border: 2px dashed #4a5568;
   margin: 2rem 0;
 }
 
 .empty-state h3 {
-  color: #6b7280;
+  color: #a0aec0;
   margin-bottom: 0.5rem;
 }
 
 .empty-state p {
-  color: #9ca3af;
+  color: #718096;
   margin: 0;
 }
 
 /* Responsive Design */
 @media (max-width: 1024px) {
-  .predictions-grid {
-    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-    gap: 1.5rem;
+  .predictions-list {
+    gap: 0;
   }
 }
 
@@ -147,6 +147,17 @@
   .dashboard-container {
     padding: 1rem;
   }
+
+  .page-header h1 {
+    font-size: 2rem;
+  }
+
+  .section-header {
+    flex-direction: column;
+    gap: 1rem;
+    align-items: flex-start;
+  }
+}
   
   .page-header {
     margin-bottom: 2rem;
