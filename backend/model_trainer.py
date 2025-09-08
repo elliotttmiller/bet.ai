@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-Advanced Sports Prediction Engine with LightGBM
-State-of-the-art machine learning model with sophisticated feature engineering
+Advanced Sports Prediction Engine with Ensemble Models
+State-of-the-art machine learning ensemble using LightGBM + XGBoost
 Following "Quantifying the performance of individual players in team competitions" methodology
 """
 
@@ -18,6 +18,7 @@ from typing import Dict, List, Tuple, Optional, Any
 from dotenv import load_dotenv
 
 import lightgbm as lgb
+import xgboost as xgb
 from sklearn.model_selection import train_test_split, cross_val_score
 from sklearn.metrics import accuracy_score, classification_report, roc_auc_score
 from sklearn.preprocessing import LabelEncoder
@@ -27,7 +28,8 @@ load_dotenv()
 
 # Configuration
 DB_PATH = Path(__file__).parent.parent / "database" / "bet_copilot.db"
-MODEL_PATH = Path(__file__).parent / "model.joblib"
+LGBM_MODEL_PATH = Path(__file__).parent / "model_lgbm.joblib"
+XGB_MODEL_PATH = Path(__file__).parent / "model_xgb.joblib"
 MODEL_METADATA_PATH = Path(__file__).parent / "model.json"
 
 @contextmanager
@@ -162,16 +164,17 @@ class AdvancedFeatureEngineer:
         
         return pd.concat(features_list, ignore_index=True)
 
-class LightGBMSportsModel:
+class EnsembleSportsModel:
     """
-    State-of-the-art LightGBM model for sports prediction
+    State-of-the-art ensemble model using LightGBM + XGBoost for sports prediction
     """
     
     def __init__(self):
-        self.model = None
+        self.lgbm_model = None
+        self.xgb_model = None
         self.feature_columns = None
         self.label_encoder = LabelEncoder()
-        self.model_version = "v2.0-lightgbm"
+        self.model_version = "v3.0-ensemble"
         self.feature_engineer = AdvancedFeatureEngineer()
         
         # LightGBM parameters optimized for sports prediction
@@ -186,6 +189,18 @@ class LightGBMSportsModel:
             'bagging_freq': 5,
             'verbose': -1,
             'random_state': 42
+        }
+        
+        # XGBoost parameters optimized for sports prediction
+        self.xgb_params = {
+            'objective': 'binary:logistic',
+            'eval_metric': 'logloss',
+            'max_depth': 6,
+            'learning_rate': 0.05,
+            'subsample': 0.8,
+            'colsample_bytree': 0.9,
+            'random_state': 42,
+            'verbosity': 0
         }
     
     def prepare_training_data(self) -> Tuple[pd.DataFrame, pd.Series]:
@@ -271,8 +286,8 @@ class LightGBMSportsModel:
         return X, y
     
     def train(self):
-        """Train the LightGBM model with advanced features."""
-        print("🤖 Starting LightGBM Model Training...")
+        """Train both LightGBM and XGBoost models for ensemble prediction."""
+        print("🤖 Starting Ensemble Model Training (LightGBM + XGBoost)...")
         
         # Prepare data
         X, y = self.prepare_training_data()
@@ -285,13 +300,12 @@ class LightGBMSportsModel:
         print(f"   Training set: {len(X_train)} samples")
         print(f"   Test set: {len(X_test)} samples")
         
-        # Create LightGBM datasets
+        # Train LightGBM model
+        print("   Training LightGBM model...")
         train_data = lgb.Dataset(X_train, label=y_train)
         valid_data = lgb.Dataset(X_test, label=y_test, reference=train_data)
         
-        # Train model
-        print("   Training LightGBM model...")
-        self.model = lgb.train(
+        self.lgbm_model = lgb.train(
             self.lgb_params,
             train_data,
             valid_sets=[valid_data],
@@ -299,33 +313,56 @@ class LightGBMSportsModel:
             callbacks=[lgb.early_stopping(stopping_rounds=50), lgb.log_evaluation(period=0)]
         )
         
-        # Evaluate model
-        train_pred = self.model.predict(X_train, num_iteration=self.model.best_iteration)
-        test_pred = self.model.predict(X_test, num_iteration=self.model.best_iteration)
+        # Train XGBoost model
+        print("   Training XGBoost model...")
+        dtrain = xgb.DMatrix(X_train, label=y_train, feature_names=self.feature_columns)
+        dtest = xgb.DMatrix(X_test, label=y_test, feature_names=self.feature_columns)
         
-        train_pred_binary = (train_pred > 0.5).astype(int)
-        test_pred_binary = (test_pred > 0.5).astype(int)
+        self.xgb_model = xgb.train(
+            self.xgb_params,
+            dtrain,
+            num_boost_round=1000,
+            evals=[(dtest, 'test')],
+            early_stopping_rounds=50,
+            verbose_eval=False
+        )
+        
+        # Evaluate ensemble
+        lgbm_train_pred = self.lgbm_model.predict(X_train, num_iteration=self.lgbm_model.best_iteration)
+        lgbm_test_pred = self.lgbm_model.predict(X_test, num_iteration=self.lgbm_model.best_iteration)
+        
+        xgb_train_pred = self.xgb_model.predict(xgb.DMatrix(X_train, feature_names=self.feature_columns))
+        xgb_test_pred = self.xgb_model.predict(xgb.DMatrix(X_test, feature_names=self.feature_columns))
+        
+        # Ensemble predictions (simple average)
+        ensemble_train_pred = (lgbm_train_pred + xgb_train_pred) / 2
+        ensemble_test_pred = (lgbm_test_pred + xgb_test_pred) / 2
+        
+        # Calculate metrics
+        train_pred_binary = (ensemble_train_pred > 0.5).astype(int)
+        test_pred_binary = (ensemble_test_pred > 0.5).astype(int)
         
         train_accuracy = accuracy_score(y_train, train_pred_binary)
         test_accuracy = accuracy_score(y_test, test_pred_binary)
-        train_auc = roc_auc_score(y_train, train_pred)
-        test_auc = roc_auc_score(y_test, test_pred)
+        train_auc = roc_auc_score(y_train, ensemble_train_pred)
+        test_auc = roc_auc_score(y_test, ensemble_test_pred)
         
-        print(f"✅ Model Training Complete!")
+        print(f"✅ Ensemble Model Training Complete!")
         print(f"   📊 Training Accuracy: {train_accuracy:.3f}")
         print(f"   📊 Test Accuracy: {test_accuracy:.3f}")
         print(f"   📊 Training AUC: {train_auc:.3f}")
         print(f"   📊 Test AUC: {test_auc:.3f}")
         
-        # Feature importance
+        # Feature importance (from LightGBM)
         feature_importance = pd.DataFrame({
             'feature': self.feature_columns,
-            'importance': self.model.feature_importance(importance_type='gain')
-        }).sort_values('importance', ascending=False)
+            'lgbm_importance': self.lgbm_model.feature_importance(importance_type='gain'),
+            'xgb_importance': self.xgb_model.get_score(importance_type='gain').values() if self.xgb_model.get_score() else [0] * len(self.feature_columns)
+        }).sort_values('lgbm_importance', ascending=False)
         
-        print(f"   🎯 Top 5 Features:")
+        print(f"   🎯 Top 5 Features (LightGBM):")
         for i, (_, row) in enumerate(feature_importance.head().iterrows()):
-            print(f"      {i+1}. {row['feature']}: {row['importance']:.1f}")
+            print(f"      {i+1}. {row['feature']}: {row['lgbm_importance']:.1f}")
         
         return {
             'train_accuracy': train_accuracy,
@@ -336,9 +373,9 @@ class LightGBMSportsModel:
         }
     
     def predict_game_outcome(self, home_team_id: int, away_team_id: int, game_date: str) -> Dict[str, Any]:
-        """Predict outcome for a specific game."""
-        if self.model is None:
-            raise ValueError("Model not trained. Call train() first.")
+        """Predict outcome for a specific game using ensemble model."""
+        if self.lgbm_model is None or self.xgb_model is None:
+            raise ValueError("Models not trained. Call train() first.")
         
         # For demo purposes, create synthetic recent performance data
         # In production, this would query actual team statistics
@@ -370,81 +407,102 @@ class LightGBMSportsModel:
         for col in self.feature_columns:
             feature_vector.append(features.get(col, 0))
         
-        # Make prediction
-        prediction_prob = self.model.predict([feature_vector], num_iteration=self.model.best_iteration)[0]
-        confidence = prediction_prob * 100 if prediction_prob > 0.5 else (1 - prediction_prob) * 100
+        # Make ensemble predictions
+        lgbm_prob = self.lgbm_model.predict([feature_vector], num_iteration=self.lgbm_model.best_iteration)[0]
+        
+        # Create XGBoost DMatrix with feature names
+        xgb_dmatrix = xgb.DMatrix([feature_vector], feature_names=self.feature_columns)
+        xgb_prob = self.xgb_model.predict(xgb_dmatrix)[0]
+        
+        # Ensemble prediction (simple average)
+        ensemble_prob = (lgbm_prob + xgb_prob) / 2
+        
+        confidence = ensemble_prob * 100 if ensemble_prob > 0.5 else (1 - ensemble_prob) * 100
         
         # Calculate edge (simplified)
         edge = max(0, (confidence - 55) / 5)
         
         return {
-            'home_win_probability': prediction_prob,
-            'away_win_probability': 1 - prediction_prob,
-            'predicted_winner': 'home' if prediction_prob > 0.5 else 'away',
+            'home_win_probability': ensemble_prob,
+            'away_win_probability': 1 - ensemble_prob,
+            'predicted_winner': 'home' if ensemble_prob > 0.5 else 'away',
             'confidence': confidence,
-            'calculated_edge': edge
+            'calculated_edge': edge,
+            'lgbm_probability': lgbm_prob,
+            'xgb_probability': xgb_prob
         }
     
     def save_model(self):
-        """Save the trained model and metadata."""
-        if self.model is None:
-            raise ValueError("No model to save. Train the model first.")
+        """Save both trained models and metadata."""
+        if self.lgbm_model is None or self.xgb_model is None:
+            raise ValueError("No models to save. Train the models first.")
         
         # Save LightGBM model
         joblib.dump({
-            'model': self.model,
+            'model': self.lgbm_model,
             'feature_columns': self.feature_columns,
             'model_version': self.model_version
-        }, MODEL_PATH)
+        }, LGBM_MODEL_PATH)
+        
+        # Save XGBoost model
+        joblib.dump({
+            'model': self.xgb_model,
+            'feature_columns': self.feature_columns,
+            'model_version': self.model_version
+        }, XGB_MODEL_PATH)
         
         # Save metadata
         metadata = {
             'model_version': self.model_version,
-            'model_type': 'LightGBM',
+            'model_type': 'Ensemble (LightGBM + XGBoost)',
             'num_features': len(self.feature_columns),
             'feature_columns': self.feature_columns,
             'lgb_params': self.lgb_params,
+            'xgb_params': self.xgb_params,
             'trained_at': datetime.now().isoformat()
         }
         
         with open(MODEL_METADATA_PATH, 'w') as f:
             json.dump(metadata, f, indent=2)
         
-        print(f"💾 Model saved to: {MODEL_PATH}")
+        print(f"💾 LightGBM model saved to: {LGBM_MODEL_PATH}")
+        print(f"💾 XGBoost model saved to: {XGB_MODEL_PATH}")
         print(f"📋 Metadata saved to: {MODEL_METADATA_PATH}")
     
     @classmethod
-    def load_model(cls):
-        """Load a previously trained model."""
-        if not MODEL_PATH.exists():
+    def load_models(cls):
+        """Load both previously trained models."""
+        if not LGBM_MODEL_PATH.exists() or not XGB_MODEL_PATH.exists():
             return None
         
         try:
-            model_data = joblib.load(MODEL_PATH)
+            lgbm_data = joblib.load(LGBM_MODEL_PATH)
+            xgb_data = joblib.load(XGB_MODEL_PATH)
             
             instance = cls()
-            instance.model = model_data['model']
-            instance.feature_columns = model_data['feature_columns']
-            instance.model_version = model_data.get('model_version', 'v2.0-lightgbm')
+            instance.lgbm_model = lgbm_data['model']
+            instance.xgb_model = xgb_data['model']
+            instance.feature_columns = lgbm_data['feature_columns']
+            instance.model_version = lgbm_data.get('model_version', 'v3.0-ensemble')
             
             return instance
         except Exception as e:
-            print(f"Error loading model: {e}")
+            print(f"Error loading models: {e}")
             return None
 
 def generate_predictions():
-    """Generate predictions for upcoming games using LightGBM model."""
-    print("🎯 Generating LightGBM Predictions...")
+    """Generate predictions for upcoming games using ensemble model."""
+    print("🎯 Generating Ensemble Predictions (LightGBM + XGBoost)...")
     
     # Load or train model
-    model = LightGBMSportsModel.load_model()
+    model = EnsembleSportsModel.load_models()
     if model is None:
-        print("   No trained model found. Training new model...")
-        model = LightGBMSportsModel()
+        print("   No trained models found. Training new ensemble...")
+        model = EnsembleSportsModel()
         model.train()
         model.save_model()
     else:
-        print(f"   Loaded existing model: {model.model_version}")
+        print(f"   Loaded existing ensemble models: {model.model_version}")
     
     # Generate sample predictions for upcoming games
     upcoming_games = [
@@ -477,7 +535,7 @@ def generate_predictions():
         cursor = conn.cursor()
         
         for game in upcoming_games:
-            # Generate prediction using LightGBM model
+            # Generate prediction using ensemble model
             prediction = model.predict_game_outcome(1, 2, game['game_date'])
             
             # Format prediction data
@@ -528,23 +586,23 @@ def generate_predictions():
         
         conn.commit()
     
-    print(f"✅ LightGBM Prediction Generation Complete!")
+    print(f"✅ Ensemble Prediction Generation Complete!")
     print(f"   📊 Generated {predictions_generated} new predictions")
     print(f"   🤖 Model: {model.model_version}")
 
 def train_model():
-    """Train the LightGBM model and generate predictions."""
-    print("🚀 Starting Advanced LightGBM Training Pipeline...")
+    """Train the ensemble model and generate predictions."""
+    print("🚀 Starting Advanced Ensemble Training Pipeline...")
     
     # Train model
-    model = LightGBMSportsModel()
+    model = EnsembleSportsModel()
     training_results = model.train()
     model.save_model()
     
     # Generate predictions
     generate_predictions()
     
-    print("🎯 Training Pipeline Complete!")
+    print("🎯 Ensemble Training Pipeline Complete!")
     return training_results
 
 if __name__ == "__main__":

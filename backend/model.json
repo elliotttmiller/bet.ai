@@ -1,6 +1,6 @@
 {
-  "model_version": "v2.0-lightgbm",
-  "model_type": "LightGBM",
+  "model_version": "v3.0-ensemble",
+  "model_type": "Ensemble (LightGBM + XGBoost)",
   "num_features": 22,
   "feature_columns": [
     "is_home",
@@ -38,5 +38,15 @@
     "verbose": -1,
     "random_state": 42
   },
-  "trained_at": "2025-09-08T22:35:15.762394"
+  "xgb_params": {
+    "objective": "binary:logistic",
+    "eval_metric": "logloss",
+    "max_depth": 6,
+    "learning_rate": 0.05,
+    "subsample": 0.8,
+    "colsample_bytree": 0.9,
+    "random_state": 42,
+    "verbosity": 0
+  },
+  "trained_at": "2025-09-08T23:13:26.841474"
 }
