@@ -1,0 +1,357 @@
+/**
+ * BetList Component Styles
+ * 
+ * Professional table design with interactive elements and responsive behavior.
+ * Optimized for data density and user interaction.
+ */
+
+.bet-list {
+  width: 100%;
+}
+
+.message {
+  padding: 1rem;
+  border-radius: 8px;
+  margin-bottom: 1.5rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-weight: 500;
+}
+
+.message--success {
+  background: #e8f5e8;
+  border: 1px solid #4CAF50;
+  color: #2e7d32;
+}
+
+.message--error {
+  background: #ffeaea;
+  border: 1px solid #F44336;
+  color: #c62828;
+}
+
+.message-icon {
+  font-size: 1.1rem;
+}
+
+/* Empty State */
+.empty-state {
+  text-align: center;
+  padding: 3rem 2rem;
+  color: #666;
+}
+
+.empty-state-icon {
+  font-size: 4rem;
+  margin-bottom: 1rem;
+  opacity: 0.5;
+}
+
+.empty-state h3 {
+  font-size: 1.5rem;
+  margin: 0 0 0.5rem 0;
+  color: #333;
+}
+
+.empty-state p {
+  font-size: 1rem;
+  margin: 0;
+  opacity: 0.8;
+}
+
+/* Table */
+.bet-table-container {
+  overflow-x: auto;
+  border-radius: 12px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+  margin-bottom: 1rem;
+}
+
+.bet-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: white;
+  font-size: 0.9rem;
+}
+
+.bet-table th {
+  background: linear-gradient(135deg, #667eea, #764ba2);
+  color: white;
+  padding: 1rem 0.75rem;
+  text-align: left;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  font-size: 0.8rem;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.bet-table th:first-child {
+  border-top-left-radius: 12px;
+}
+
+.bet-table th:last-child {
+  border-top-right-radius: 12px;
+}
+
+.bet-table td {
+  padding: 1rem 0.75rem;
+  border-bottom: 1px solid #f0f0f0;
+  vertical-align: middle;
+}
+
+.bet-row:hover {
+  background: rgba(102, 126, 234, 0.05);
+}
+
+.bet-row:last-child td {
+  border-bottom: none;
+}
+
+/* Column Specific Styles */
+.bet-date {
+  font-size: 0.85rem;
+  color: #666;
+  white-space: nowrap;
+}
+
+.bet-matchup strong {
+  color: #333;
+  font-weight: 600;
+}
+
+.bet-type {
+  font-size: 0.85rem;
+  color: #666;
+  text-transform: capitalize;
+}
+
+.bet-stake {
+  font-weight: 600;
+  color: #333;
+}
+
+.bet-odds {
+  font-family: 'Courier New', monospace;
+  font-weight: 600;
+  color: #333;
+}
+
+/* Status Badges */
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.3rem 0.6rem;
+  border-radius: 20px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.status-badge--pending {
+  background: #fff3e0;
+  color: #f57c00;
+  border: 1px solid #ffcc02;
+}
+
+.status-badge--won {
+  background: #e8f5e8;
+  color: #2e7d32;
+  border: 1px solid #4CAF50;
+}
+
+.status-badge--lost {
+  background: #ffeaea;
+  color: #c62828;
+  border: 1px solid #F44336;
+}
+
+/* Profit/Loss */
+.profit-loss {
+  font-weight: 600;
+  font-family: 'Courier New', monospace;
+}
+
+.profit-loss--positive {
+  color: #2e7d32;
+}
+
+.profit-loss--negative {
+  color: #c62828;
+}
+
+.profit-loss--pending {
+  color: #666;
+  font-style: italic;
+}
+
+/* Settlement Buttons */
+.settlement-buttons {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.settle-button {
+  padding: 0.4rem 0.8rem;
+  border: none;
+  border-radius: 6px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.settle-button--won {
+  background: #4CAF50;
+  color: white;
+}
+
+.settle-button--won:hover:not(:disabled) {
+  background: #45a049;
+  transform: translateY(-1px);
+}
+
+.settle-button--lost {
+  background: #F44336;
+  color: white;
+}
+
+.settle-button--lost:hover:not(:disabled) {
+  background: #e53935;
+  transform: translateY(-1px);
+}
+
+.settle-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.settled-indicator {
+  color: #666;
+  font-style: italic;
+  font-size: 0.85rem;
+}
+
+/* Summary */
+.bet-list-summary {
+  text-align: center;
+  padding: 1rem;
+  color: #666;
+  font-size: 0.9rem;
+  border-top: 1px solid #f0f0f0;
+}
+
+/* Responsive Design */
+@media (max-width: 1024px) {
+  .bet-table {
+    font-size: 0.8rem;
+  }
+
+  .bet-table th,
+  .bet-table td {
+    padding: 0.75rem 0.5rem;
+  }
+
+  .settlement-buttons {
+    flex-direction: column;
+    gap: 0.25rem;
+  }
+
+  .settle-button {
+    padding: 0.3rem 0.6rem;
+    font-size: 0.75rem;
+  }
+}
+
+@media (max-width: 768px) {
+  .bet-table-container {
+    border-radius: 8px;
+  }
+
+  .bet-table th:first-child,
+  .bet-table th:last-child {
+    border-radius: 0;
+  }
+
+  .bet-table th {
+    padding: 0.75rem 0.5rem;
+    font-size: 0.7rem;
+  }
+
+  .bet-table td {
+    padding: 0.75rem 0.5rem;
+  }
+
+  .bet-date {
+    font-size: 0.75rem;
+  }
+
+  .settlement-buttons {
+    flex-direction: column;
+    gap: 0.25rem;
+  }
+
+  .settle-button {
+    padding: 0.25rem 0.5rem;
+    font-size: 0.7rem;
+  }
+}
+
+@media (max-width: 640px) {
+  /* Stack table for very small screens */
+  .bet-table,
+  .bet-table thead,
+  .bet-table tbody,
+  .bet-table th,
+  .bet-table td,
+  .bet-table tr {
+    display: block;
+  }
+
+  .bet-table thead tr {
+    position: absolute;
+    top: -9999px;
+    left: -9999px;
+  }
+
+  .bet-table tr {
+    border: 1px solid #ccc;
+    margin-bottom: 1rem;
+    border-radius: 8px;
+    padding: 1rem;
+    background: white;
+  }
+
+  .bet-table td {
+    border: none;
+    padding: 0.5rem 0;
+    position: relative;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .bet-table td::before {
+    content: attr(data-label);
+    font-weight: 600;
+    color: #666;
+    text-transform: uppercase;
+    font-size: 0.7rem;
+    letter-spacing: 0.5px;
+  }
+
+  .settlement-buttons {
+    flex-direction: row;
+    gap: 0.5rem;
+    margin-top: 0.5rem;
+  }
+}
