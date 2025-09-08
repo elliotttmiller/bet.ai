@@ -7,6 +7,7 @@ Enterprise-grade betting analytics API with AI integration
 import os
 import sqlite3
 import requests
+import joblib
 from datetime import datetime
 from pathlib import Path
 from typing import List, Optional, Dict, Any
@@ -35,8 +36,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Database path
+# Database and model paths
 DB_PATH = Path(__file__).parent.parent / "database" / "bet_copilot.db"
+MODEL_PATH = Path(__file__).parent / "model.joblib"
+SCALER_PATH = Path(__file__).parent / "scaler.joblib"
 LM_STUDIO_API_URL = os.getenv("LM_STUDIO_API_URL", "http://localhost:1234/v1/chat/completions")
 
 # Pydantic models
@@ -288,7 +291,7 @@ async def settle_bet(bet_id: int, settle: BetSettle):
 
 @app.get("/api/predictions", response_model=List[PredictionResponse])
 async def get_predictions(limit: int = 10):
-    """Get AI-generated ML predictions."""
+    """Get AI-generated ML predictions from trained model."""
     with get_db() as conn:
         cursor = conn.cursor()
         cursor.execute("""
@@ -298,48 +301,213 @@ async def get_predictions(limit: int = 10):
         """, (limit,))
         
         rows = cursor.fetchall()
+        
+        # If no predictions exist, generate some using the trained model
         if not rows:
-            # If no predictions exist, generate some
-            print("No predictions found, running model trainer...")
+            print("No predictions found, checking for trained model...")
             try:
-                from pathlib import Path
-                import subprocess
-                import sys
-                
-                model_trainer_path = Path(__file__).parent / "model_trainer.py"
-                subprocess.run([sys.executable, str(model_trainer_path)], check=True)
-                
-                # Try fetching again
-                cursor.execute("""
-                    SELECT * FROM predictions 
-                    ORDER BY created_at DESC 
-                    LIMIT ?
-                """, (limit,))
-                rows = cursor.fetchall()
+                if MODEL_PATH.exists() and SCALER_PATH.exists():
+                    print("Found trained model, generating predictions...")
+                    # Import and run model trainer to generate predictions
+                    from pathlib import Path
+                    import subprocess
+                    import sys
+                    
+                    model_trainer_path = Path(__file__).parent / "model_trainer.py"
+                    result = subprocess.run([sys.executable, str(model_trainer_path)], 
+                                          capture_output=True, text=True, timeout=60)
+                    
+                    if result.returncode == 0:
+                        print("Model trainer completed successfully")
+                        # Try fetching again
+                        cursor.execute("""
+                            SELECT * FROM predictions 
+                            ORDER BY created_at DESC 
+                            LIMIT ?
+                        """, (limit,))
+                        rows = cursor.fetchall()
+                    else:
+                        print(f"Model trainer failed: {result.stderr}")
+                else:
+                    print("No trained model found, training new model...")
+                    # Run model trainer to create and train model
+                    from pathlib import Path
+                    import subprocess
+                    import sys
+                    
+                    model_trainer_path = Path(__file__).parent / "model_trainer.py"
+                    result = subprocess.run([sys.executable, str(model_trainer_path)], 
+                                          capture_output=True, text=True, timeout=120)
+                    
+                    if result.returncode == 0:
+                        print("Model training completed successfully")
+                        # Try fetching again
+                        cursor.execute("""
+                            SELECT * FROM predictions 
+                            ORDER BY created_at DESC 
+                            LIMIT ?
+                        """, (limit,))
+                        rows = cursor.fetchall()
+                    else:
+                        print(f"Model training failed: {result.stderr}")
+                        
             except Exception as e:
-                print(f"Error running model trainer: {e}")
+                print(f"Error with model operations: {e}")
         
         return [PredictionResponse(**dict(row)) for row in rows]
 
 @app.post("/api/betai/query")
 async def query_betai(query: BetAIQuery):
-    """Proxy query to LM Studio AI."""
+    """RAG-enhanced AI query with retrieval from local database."""
     try:
-        # Prepare request to LM Studio
+        # Step 1: Analyze query to determine what data to retrieve
+        query_text = query.message.lower()
+        
+        # Step 2: Retrieve relevant data from database based on query content
+        relevant_data = {}
+        
+        with get_db() as conn:
+            cursor = conn.cursor()
+            
+            # Check for betting/performance related queries
+            if any(keyword in query_text for keyword in ['bet', 'profit', 'loss', 'roi', 'performance', 'win rate', 'balance']):
+                # Get betting statistics
+                cursor.execute("""
+                    SELECT 
+                        COUNT(*) as total_bets,
+                        COUNT(CASE WHEN status = 'Won' THEN 1 END) as won_bets,
+                        COUNT(CASE WHEN status = 'Lost' THEN 1 END) as lost_bets,
+                        COUNT(CASE WHEN status = 'Pending' THEN 1 END) as pending_bets,
+                        COALESCE(SUM(stake), 0) as total_staked,
+                        COALESCE(SUM(profit_loss), 0) as total_profit_loss
+                    FROM bets
+                """)
+                bet_stats = cursor.fetchone()
+                
+                if bet_stats and bet_stats[0] > 0:  # Check if there are any bets
+                    total_bets = bet_stats[0] or 0
+                    won_bets = bet_stats[1] or 0
+                    lost_bets = bet_stats[2] or 0
+                    pending_bets = bet_stats[3] or 0
+                    total_staked = bet_stats[4] or 0
+                    total_profit_loss = bet_stats[5] or 0
+                    
+                    win_rate = (won_bets / total_bets * 100) if total_bets > 0 else 0
+                    roi = (total_profit_loss / total_staked * 100) if total_staked > 0 else 0
+                    
+                    relevant_data['betting_performance'] = {
+                        'total_bets': total_bets,
+                        'won_bets': won_bets,
+                        'lost_bets': lost_bets,
+                        'pending_bets': pending_bets,
+                        'total_staked': total_staked,
+                        'total_profit_loss': total_profit_loss,
+                        'win_rate': win_rate,
+                        'roi': roi
+                    }
+                
+                # Get current balance
+                cursor.execute("SELECT running_balance FROM ledger ORDER BY entry_id DESC LIMIT 1")
+                balance_result = cursor.fetchone()
+                relevant_data['current_balance'] = balance_result[0] if balance_result else 0
+            
+            # Check for recent bet queries
+            if any(keyword in query_text for keyword in ['recent', 'latest', 'last', 'today', 'this week']):
+                cursor.execute("""
+                    SELECT matchup, bet_type, stake, odds, status, profit_loss, bet_date
+                    FROM bets 
+                    ORDER BY created_at DESC 
+                    LIMIT 5
+                """)
+                recent_bets = cursor.fetchall()
+                relevant_data['recent_bets'] = [dict(bet) for bet in recent_bets]
+            
+            # Check for prediction queries
+            if any(keyword in query_text for keyword in ['prediction', 'pick', 'forecast', 'recommend']):
+                cursor.execute("""
+                    SELECT matchup, predicted_pick, confidence_score, predicted_odds, sport, league
+                    FROM predictions 
+                    ORDER BY created_at DESC 
+                    LIMIT 5
+                """)
+                predictions = cursor.fetchall()
+                relevant_data['recent_predictions'] = [dict(pred) for pred in predictions]
+            
+            # Check for sport-specific queries (NBA, NFL, etc.)
+            sports = ['nba', 'nfl', 'basketball', 'football']
+            mentioned_sport = next((sport for sport in sports if sport in query_text), None)
+            if mentioned_sport:
+                # Get sport-specific data
+                sport_filter = 'NBA' if mentioned_sport in ['nba', 'basketball'] else 'NFL' if mentioned_sport in ['nfl', 'football'] else mentioned_sport.upper()
+                
+                cursor.execute("""
+                    SELECT matchup, predicted_pick, confidence_score, sport
+                    FROM predictions 
+                    WHERE sport = ? 
+                    ORDER BY created_at DESC 
+                    LIMIT 3
+                """, (sport_filter,))
+                sport_predictions = cursor.fetchall()
+                relevant_data[f'{sport_filter.lower()}_predictions'] = [dict(pred) for pred in sport_predictions]
+        
+        # Step 3: Build augmented prompt with retrieved data
+        system_prompt = """You are BetAI, an expert sports betting analyst with access to the user's personal betting database. 
+Provide insightful, data-driven responses based on the retrieved data. Be specific with numbers and percentages when available.
+Always be helpful, professional, and focus on actionable insights."""
+        
+        # Create context from retrieved data
+        context_parts = []
+        if 'betting_performance' in relevant_data:
+            perf = relevant_data['betting_performance']
+            context_parts.append(f"""
+BETTING PERFORMANCE DATA:
+- Total Bets: {perf['total_bets']}
+- Won: {perf['won_bets']}, Lost: {perf['lost_bets']}, Pending: {perf['pending_bets']}
+- Win Rate: {perf['win_rate']:.1f}%
+- Total Staked: ${perf['total_staked']:.2f}
+- Total Profit/Loss: ${perf['total_profit_loss']:.2f}
+- ROI: {perf['roi']:.1f}%
+- Current Balance: ${relevant_data.get('current_balance', 0):.2f}""")
+        
+        if 'recent_bets' in relevant_data and relevant_data['recent_bets']:
+            context_parts.append("RECENT BETS:")
+            for bet in relevant_data['recent_bets'][:3]:
+                context_parts.append(f"- {bet['matchup']}: {bet['bet_type']} ${bet['stake']} at {bet['odds']} odds - {bet['status']}")
+        
+        if 'recent_predictions' in relevant_data and relevant_data['recent_predictions']:
+            context_parts.append("RECENT AI PREDICTIONS:")
+            for pred in relevant_data['recent_predictions'][:3]:
+                context_parts.append(f"- {pred['matchup']}: {pred['predicted_pick']} ({pred['confidence_score']:.1f}% confidence)")
+        
+        # Add sport-specific predictions if available
+        for key, value in relevant_data.items():
+            if key.endswith('_predictions') and value:
+                sport_name = key.replace('_predictions', '').upper()
+                context_parts.append(f"\n{sport_name} PREDICTIONS:")
+                for pred in value[:2]:
+                    context_parts.append(f"- {pred['matchup']}: {pred['predicted_pick']} ({pred['confidence_score']:.1f}% confidence)")
+        
+        # Combine context
+        context = '\n'.join(context_parts) if context_parts else "No relevant betting data found in database."
+        
+        # Step 4: Create augmented prompt
+        augmented_prompt = f"""Based on the following data from the user's personal betting database, please answer their question:
+
+{context}
+
+User Question: {query.message}
+
+Please provide a helpful, data-driven response based on the available information."""
+        
+        # Step 5: Send to LM Studio
         payload = {
             "model": "local-model",
             "messages": [
-                {
-                    "role": "system", 
-                    "content": "You are BetAI, an expert sports betting analyst. Provide insightful, data-driven responses about betting strategies, odds analysis, and sports predictions. Be concise but informative."
-                },
-                {
-                    "role": "user", 
-                    "content": query.message
-                }
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": augmented_prompt}
             ],
             "temperature": 0.7,
-            "max_tokens": 500
+            "max_tokens": 800
         }
         
         # Make request to LM Studio
@@ -355,10 +523,63 @@ async def query_betai(query: BetAIQuery):
             ai_response = result.get("choices", [{}])[0].get("message", {}).get("content", "No response from AI")
             return {"response": ai_response}
         else:
-            return {"response": "BetAI is currently unavailable. Please ensure LM Studio is running on localhost:1234"}
+            # Fallback response with retrieved data
+            fallback_response = "BetAI is currently unavailable, but here's what I found in your data:\n\n"
+            if context != "No relevant betting data found in database.":
+                fallback_response += context.replace('\n', '\n\n')
+            else:
+                # Still try to show predictions even if no specific data retrieved
+                with get_db() as conn:
+                    cursor = conn.cursor()
+                    cursor.execute("SELECT matchup, predicted_pick, confidence_score FROM predictions ORDER BY created_at DESC LIMIT 3")
+                    predictions = cursor.fetchall()
+                    if predictions:
+                        fallback_response += "🤖 RECENT AI PREDICTIONS:\n"
+                        for pred in predictions:
+                            fallback_response += f"• {pred[0]}: {pred[1]} ({pred[2]:.1f}% confidence)\n"
+                        fallback_response += f"\n💰 Current balance: ${relevant_data.get('current_balance', 1000):.2f}\n"
+                    else:
+                        fallback_response += "No relevant data found for your query. Try asking about your betting performance, recent bets, or predictions."
+            return {"response": fallback_response}
             
     except requests.exceptions.RequestException:
-        return {"response": "BetAI is currently unavailable. Please ensure LM Studio is running on localhost:1234"}
+        # Enhanced fallback with retrieved data
+        fallback_response = "BetAI is currently unavailable (LM Studio connection failed), but I can provide some insights from your data:\n\n"
+        
+        # Include retrieved data in fallback
+        if context != "No relevant betting data found in database.":
+            fallback_response += context.replace('\n', '\n\n')
+        else:
+            # Try to provide basic analysis even without LLM
+            try:
+                with get_db() as conn:
+                    cursor = conn.cursor()
+                    cursor.execute("SELECT COUNT(*) as total_bets, COUNT(CASE WHEN status = 'Won' THEN 1 END) as won_bets FROM bets")
+                    basic_stats = cursor.fetchone()
+                    if basic_stats and basic_stats[0] > 0:
+                        win_rate = (basic_stats[1] / basic_stats[0] * 100)
+                        fallback_response += f"📊 You have {basic_stats[0]} total bets with a {win_rate:.1f}% win rate.\n"
+                    
+                    cursor.execute("SELECT running_balance FROM ledger ORDER BY entry_id DESC LIMIT 1")
+                    balance = cursor.fetchone()
+                    if balance:
+                        fallback_response += f"💰 Current balance: ${balance[0]:.2f}\n"
+                    
+                    # Always include recent predictions if available
+                    cursor.execute("SELECT matchup, predicted_pick, confidence_score FROM predictions ORDER BY created_at DESC LIMIT 3")
+                    predictions = cursor.fetchall()
+                    if predictions:
+                        fallback_response += "\n🤖 RECENT AI PREDICTIONS:\n"
+                        for pred in predictions:
+                            fallback_response += f"• {pred[0]}: {pred[1]} ({pred[2]:.1f}% confidence)\n"
+                        
+                    fallback_response += "\nPlease ensure LM Studio is running on localhost:1234 for AI analysis."
+            except Exception:
+                fallback_response = "BetAI is currently unavailable. Please ensure LM Studio is running on localhost:1234"
+        
+        return {"response": fallback_response}
+    except Exception as e:
+        return {"response": f"Sorry, I encountered an error while processing your request: {str(e)}"}
 
 if __name__ == "__main__":
     import uvicorn
