@@ -28,11 +28,13 @@ def create_database():
             odds INTEGER NOT NULL,
             status TEXT NOT NULL DEFAULT 'Pending',
             profit_loss REAL NOT NULL DEFAULT 0.0,
+            brier_score REAL,
             bet_date TEXT NOT NULL,
             created_at TEXT NOT NULL,
             updated_at TEXT NOT NULL,
             CONSTRAINT valid_status CHECK (status IN ('Pending', 'Won', 'Lost')),
-            CONSTRAINT positive_stake CHECK (stake > 0)
+            CONSTRAINT positive_stake CHECK (stake > 0),
+            CONSTRAINT valid_brier_score CHECK (brier_score IS NULL OR (brier_score >= 0 AND brier_score <= 1))
         )
     """)
     
