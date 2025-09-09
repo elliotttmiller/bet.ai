@@ -454,10 +454,14 @@ class EnsembleSportsModel:
         print(f"   📊 Test AUC: {test_auc:.3f}")
         
         # Feature importance (from LightGBM)
+        lgbm_importance = self.lgbm_model.feature_importance(importance_type='gain')
+        xgb_score_dict = self.xgb_model.get_score(importance_type='gain') if self.xgb_model.get_score() else {}
+        xgb_importance = [xgb_score_dict.get(feat, 0) for feat in self.feature_columns]
+        
         feature_importance = pd.DataFrame({
             'feature': self.feature_columns,
-            'lgbm_importance': self.lgbm_model.feature_importance(importance_type='gain'),
-            'xgb_importance': self.xgb_model.get_score(importance_type='gain').values() if self.xgb_model.get_score() else [0] * len(self.feature_columns)
+            'lgbm_importance': lgbm_importance,
+            'xgb_importance': xgb_importance
         }).sort_values('lgbm_importance', ascending=False)
         
         print(f"   🎯 Top 5 Features (LightGBM):")

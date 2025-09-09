@@ -1,8 +1,8 @@
 {
-  "model_version": "v3.0-ensemble-nba",
+  "model_version": "v5.0-elo-ensemble-nba",
   "model_type": "Ensemble (LightGBM + XGBoost)",
   "sport": "NBA",
-  "num_features": 22,
+  "num_features": 26,
   "feature_columns": [
     "is_home",
     "strength_of_schedule",
@@ -25,7 +25,11 @@
     "h2h_wins",
     "h2h_games",
     "h2h_win_rate",
-    "h2h_avg_margin"
+    "h2h_avg_margin",
+    "team_elo",
+    "opponent_elo",
+    "elo_difference",
+    "elo_advantage"
   ],
   "lgb_params": {
     "objective": "binary",
@@ -49,5 +53,5 @@
     "random_state": 42,
     "verbosity": 0
   },
-  "trained_at": "2025-09-09T00:21:33.819549"
+  "trained_at": "2025-09-09T01:04:09.354444"
 }
