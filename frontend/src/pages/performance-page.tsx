@@ -61,7 +61,7 @@ export function PerformancePage() {
   const fetchPerformanceData = async () => {
     try {
       setLoading(true)
-      const response = await fetch('http://localhost:8001/api/performance/history')
+      const response = await fetch('http://localhost:8000/api/performance/history')
       if (!response.ok) {
         throw new Error('Failed to fetch performance data')
       }
