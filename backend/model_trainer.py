@@ -140,7 +140,7 @@ class AdvancedFeatureEngineer:
         return h2h_features
     
     def create_advanced_features(self, games_data: pd.DataFrame) -> pd.DataFrame:
-        """Create comprehensive feature set for each game."""
+        """Create comprehensive feature set for each game including Elo ratings."""
         features_list = []
         
         # Process each team's data
@@ -164,11 +164,103 @@ class AdvancedFeatureEngineer:
             team_games['game_date'] = pd.to_datetime(team_games['game_date'])
             basic_features['rest_days'] = team_games['game_date'].diff().dt.days.fillna(7)
             
+            # Elo rating features (NEW!)
+            elo_features = self.calculate_elo_features(team_games, games_data)
+            
             # Combine all features
-            team_features = pd.concat([basic_features, rolling_features, h2h_features], axis=1)
+            team_features = pd.concat([basic_features, rolling_features, h2h_features, elo_features], axis=1)
             features_list.append(team_features)
         
         return pd.concat(features_list, ignore_index=True)
+    
+    def calculate_elo_features(self, team_games: pd.DataFrame, all_games_data: pd.DataFrame) -> pd.DataFrame:
+        """Calculate Elo rating features for enhanced prediction accuracy."""
+        elo_features = pd.DataFrame(index=team_games.index)
+        
+        # Initialize Elo features
+        elo_features['team_elo'] = 1500.0
+        elo_features['opponent_elo'] = 1500.0
+        elo_features['elo_difference'] = 0.0
+        elo_features['elo_advantage'] = 0.0
+        
+        # Get team and sport info
+        if len(team_games) == 0:
+            return elo_features
+        
+        team_id = team_games.iloc[0]['team_id']
+        # Assume sport can be inferred from game context - for demo, use NBA
+        sport = 'NBA'
+        
+        try:
+            # Import here to avoid circular imports
+            from pathlib import Path
+            import sqlite3
+            from contextlib import contextmanager
+            
+            @contextmanager
+            def get_db():
+                db_path = Path(__file__).parent.parent / "database" / "bet_copilot.db"
+                conn = sqlite3.connect(db_path)
+                conn.row_factory = sqlite3.Row
+                try:
+                    yield conn
+                finally:
+                    conn.close()
+            
+            with get_db() as conn:
+                cursor = conn.cursor()
+                
+                for idx, game in team_games.iterrows():
+                    game_date = game['game_date']
+                    opponent_id = game['opponent_id']
+                    
+                    # Convert datetime to string if needed
+                    if hasattr(game_date, 'strftime'):
+                        date_str = game_date.strftime('%Y-%m-%d')
+                    else:
+                        date_str = str(game_date)[:10]
+                    
+                    # Get team's Elo rating on game date
+                    cursor.execute("""
+                        SELECT elo_rating FROM elo_ratings
+                        WHERE team_id = ? AND sport = ? AND date <= ?
+                        ORDER BY date DESC
+                        LIMIT 1
+                    """, (team_id, sport, date_str))
+                    
+                    team_elo_result = cursor.fetchone()
+                    team_elo = team_elo_result[0] if team_elo_result else 1500.0
+                    
+                    # Get opponent's Elo rating on game date
+                    cursor.execute("""
+                        SELECT elo_rating FROM elo_ratings
+                        WHERE team_id = ? AND sport = ? AND date <= ?
+                        ORDER BY date DESC
+                        LIMIT 1
+                    """, (opponent_id, sport, date_str))
+                    
+                    opponent_elo_result = cursor.fetchone()
+                    opponent_elo = opponent_elo_result[0] if opponent_elo_result else 1500.0
+                    
+                    # Calculate Elo features
+                    elo_difference = team_elo - opponent_elo
+                    
+                    # Home advantage consideration (65 points for NBA)
+                    home_bonus = 65.0 if game['is_home'] else -65.0
+                    elo_advantage = elo_difference + home_bonus
+                    
+                    # Store features
+                    elo_features.loc[idx, 'team_elo'] = team_elo
+                    elo_features.loc[idx, 'opponent_elo'] = opponent_elo
+                    elo_features.loc[idx, 'elo_difference'] = elo_difference
+                    elo_features.loc[idx, 'elo_advantage'] = elo_advantage
+                    
+        except Exception as e:
+            print(f"Warning: Could not load Elo features: {e}")
+            # Use default values if Elo ratings are not available
+            pass
+        
+        return elo_features
 
 class EnsembleSportsModel:
     """
@@ -181,7 +273,7 @@ class EnsembleSportsModel:
         self.xgb_model = None
         self.feature_columns = None
         self.label_encoder = LabelEncoder()
-        self.model_version = f"v3.0-ensemble-{self.sport.lower()}"
+        self.model_version = f"v5.0-elo-ensemble-{self.sport.lower()}"
         self.feature_engineer = AdvancedFeatureEngineer()
         self.model_paths = get_model_paths(self.sport)
         
@@ -362,10 +454,14 @@ class EnsembleSportsModel:
         print(f"   📊 Test AUC: {test_auc:.3f}")
         
         # Feature importance (from LightGBM)
+        lgbm_importance = self.lgbm_model.feature_importance(importance_type='gain')
+        xgb_score_dict = self.xgb_model.get_score(importance_type='gain') if self.xgb_model.get_score() else {}
+        xgb_importance = [xgb_score_dict.get(feat, 0) for feat in self.feature_columns]
+        
         feature_importance = pd.DataFrame({
             'feature': self.feature_columns,
-            'lgbm_importance': self.lgbm_model.feature_importance(importance_type='gain'),
-            'xgb_importance': self.xgb_model.get_score(importance_type='gain').values() if self.xgb_model.get_score() else [0] * len(self.feature_columns)
+            'lgbm_importance': lgbm_importance,
+            'xgb_importance': xgb_importance
         }).sort_values('lgbm_importance', ascending=False)
         
         print(f"   🎯 Top 5 Features (LightGBM):")
