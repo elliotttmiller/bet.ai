@@ -1,0 +1,53 @@
+{
+  "model_version": "v3.0-ensemble-nfl",
+  "model_type": "Ensemble (LightGBM + XGBoost)",
+  "sport": "NFL",
+  "num_features": 22,
+  "feature_columns": [
+    "is_home",
+    "strength_of_schedule",
+    "rest_days",
+    "win_rate_5g",
+    "avg_points_5g",
+    "avg_points_allowed_5g",
+    "point_diff_5g",
+    "form_5g",
+    "win_rate_10g",
+    "avg_points_10g",
+    "avg_points_allowed_10g",
+    "point_diff_10g",
+    "form_10g",
+    "win_rate_20g",
+    "avg_points_20g",
+    "avg_points_allowed_20g",
+    "point_diff_20g",
+    "form_20g",
+    "h2h_wins",
+    "h2h_games",
+    "h2h_win_rate",
+    "h2h_avg_margin"
+  ],
+  "lgb_params": {
+    "objective": "binary",
+    "metric": "binary_logloss",
+    "boosting_type": "gbdt",
+    "num_leaves": 31,
+    "learning_rate": 0.05,
+    "feature_fraction": 0.9,
+    "bagging_fraction": 0.8,
+    "bagging_freq": 5,
+    "verbose": -1,
+    "random_state": 42
+  },
+  "xgb_params": {
+    "objective": "binary:logistic",
+    "eval_metric": "logloss",
+    "max_depth": 6,
+    "learning_rate": 0.05,
+    "subsample": 0.8,
+    "colsample_bytree": 0.9,
+    "random_state": 42,
+    "verbosity": 0
+  },
+  "trained_at": "2025-09-09T00:21:48.335629"
+}
