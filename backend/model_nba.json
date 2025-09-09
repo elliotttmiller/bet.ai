@@ -1,8 +1,8 @@
 {
-  "model_version": "v5.0-elo-ensemble-nba",
+  "model_version": "v6.0-player-impact-elo-ensemble-nba",
   "model_type": "Ensemble (LightGBM + XGBoost)",
   "sport": "NBA",
-  "num_features": 26,
+  "num_features": 34,
   "feature_columns": [
     "is_home",
     "strength_of_schedule",
@@ -29,7 +29,15 @@
     "team_elo",
     "opponent_elo",
     "elo_difference",
-    "elo_advantage"
+    "elo_advantage",
+    "team_total_impact",
+    "team_avg_impact",
+    "team_top5_impact",
+    "opponent_total_impact",
+    "opponent_avg_impact",
+    "opponent_top5_impact",
+    "impact_advantage",
+    "star_player_advantage"
   ],
   "lgb_params": {
     "objective": "binary",
@@ -53,5 +61,5 @@
     "random_state": 42,
     "verbosity": 0
   },
-  "trained_at": "2025-09-09T01:04:09.354444"
+  "trained_at": "2025-09-09T01:23:03.088071"
 }

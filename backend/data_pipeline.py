@@ -225,8 +225,8 @@ def update_team_stats(cursor, team_id):
         """, (team_id, games_played, wins, losses, points_scored, points_allowed, datetime.now().isoformat()))
 
 def run_data_pipeline():
-    """Execute the complete data pipeline."""
-    print("🏈 Starting Data Pipeline...")
+    """Execute the complete data pipeline with player-level support (V6)."""
+    print("🏈 Starting Enhanced V6 Data Pipeline (Player-Level Intelligence)...")
     
     with get_db() as conn:
         cursor = conn.cursor()
@@ -283,6 +283,41 @@ def run_data_pipeline():
         for team_id in nfl_team_ids:
             update_team_stats(cursor, team_id)
         
+        # V6 Enhancement: Player-Level Data Processing
+        print("\n⭐ Processing V6 Player-Level Data...")
+        
+        # Initialize players if they don't exist (V6 feature)
+        cursor.execute("SELECT COUNT(*) FROM players")
+        player_count = cursor.fetchone()[0]
+        
+        if player_count == 0:
+            print("   Initializing player database...")
+            # Import and run player initialization
+            try:
+                import sys
+                from pathlib import Path
+                
+                # Add the backend directory to path
+                backend_path = Path(__file__).parent
+                if str(backend_path) not in sys.path:
+                    sys.path.append(str(backend_path))
+                
+                from player_impact_model import PlayerImpactCalculator
+                
+                calculator = PlayerImpactCalculator()
+                calculator.initialize_sample_players()
+                print("   ✅ Player initialization complete")
+                
+            except Exception as e:
+                print(f"   ⚠️ Player initialization failed: {e}")
+        else:
+            print(f"   Found {player_count} existing players")
+        
+        # Update player game stats based on recent games (V6 feature)
+        print("   Updating player game statistics...")
+        updated_stats = update_player_game_stats(cursor, conn)
+        print(f"   Updated {updated_stats} player stat records")
+        
         conn.commit()
         
         # Summary statistics
@@ -295,10 +330,96 @@ def run_data_pipeline():
         cursor.execute("SELECT COUNT(*) FROM historical_stats")
         stats_count = cursor.fetchone()[0]
         
-        print(f"\n✅ Data Pipeline Complete!")
+        cursor.execute("SELECT COUNT(*) FROM players")
+        player_count = cursor.fetchone()[0]
+        
+        cursor.execute("SELECT COUNT(*) FROM player_game_stats")
+        player_stats_count = cursor.fetchone()[0]
+        
+        print(f"\n✅ Enhanced V6 Data Pipeline Complete!")
         print(f"   📊 Teams: {team_count}")
         print(f"   🏟️  Games: {game_count}")
         print(f"   📈 Team Stats: {stats_count}")
+        print(f"   ⭐ Players: {player_count} (V6)")
+        print(f"   📊 Player Stats: {player_stats_count} (V6)")
+
+def update_player_game_stats(cursor, conn):
+    """Update player game statistics based on recent completed games (V6 Feature)."""
+    try:
+        # Get recent completed games
+        cursor.execute("""
+            SELECT game_id, sport, home_team_id, away_team_id, game_date
+            FROM games 
+            WHERE status = 'completed' AND game_date >= datetime('now', '-7 days')
+        """)
+        
+        recent_games = cursor.fetchall()
+        
+        if not recent_games:
+            return 0
+        
+        updated_count = 0
+        
+        # For each recent game, check if we need to generate/update player stats
+        for game in recent_games:
+            game_id, sport, home_team_id, away_team_id, game_date = game
+            
+            # Check if we already have player stats for this game
+            cursor.execute("""
+                SELECT COUNT(*) FROM player_game_stats 
+                WHERE game_id = ?
+            """, (game_id,))
+            
+            existing_stats = cursor.fetchone()[0]
+            
+            if existing_stats > 0:
+                continue  # Already have stats for this game
+            
+            # Get players from both teams
+            cursor.execute("""
+                SELECT player_id, player_name, position 
+                FROM players 
+                WHERE team_id IN (?, ?) AND sport = ?
+            """, (home_team_id, away_team_id, sport))
+            
+            players = cursor.fetchall()
+            
+            # Generate stats for a subset of players (simulating partial participation)
+            import random
+            random.seed(game_id)  # Deterministic but varied
+            
+            participating_players = random.sample(players, min(len(players), random.randint(5, 12)))
+            
+            for player_id, player_name, position in participating_players:
+                # Generate game stats
+                from player_impact_model import PlayerImpactCalculator
+                calculator = PlayerImpactCalculator()
+                stats = calculator.generate_game_stats_by_sport(sport, position, player_name)
+                
+                # Insert stats
+                cursor.execute("""
+                    INSERT OR IGNORE INTO player_game_stats (
+                        player_id, game_id, minutes_played, points, rebounds, assists,
+                        steals, blocks, turnovers, field_goals_made, field_goals_attempted,
+                        three_pointers_made, three_pointers_attempted, free_throws_made,
+                        free_throws_attempted, fouls, plus_minus, created_at
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """, (
+                    player_id, game_id, stats['minutes'], stats['points'], stats['rebounds'],
+                    stats['assists'], stats['steals'], stats['blocks'], stats['turnovers'],
+                    stats['fgm'], stats['fga'], stats['3pm'], stats['3pa'],
+                    stats['ftm'], stats['fta'], stats['fouls'], stats['plus_minus'],
+                    datetime.now().isoformat()
+                ))
+                
+                updated_count += 1
+        
+        conn.commit()
+        return updated_count
+        
+    except Exception as e:
+        print(f"   ⚠️ Player stats update failed: {e}")
+        return 0
 
 if __name__ == "__main__":
     run_data_pipeline()
