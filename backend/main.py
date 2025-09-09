@@ -1125,30 +1125,79 @@ async def get_performance_history():
 
 @app.post("/api/betai/query")
 async def query_betai(query: BetAIQuery):
-    """Advanced RAG-powered AI query with comprehensive database context and LightGBM insights."""
+    """V5 RAG-powered AI query with Elo ratings, CLV validation, and comprehensive quantitative context."""
     try:
-        # Enhanced context retrieval with LightGBM insights
+        # Enhanced context retrieval with Elo and CLV insights
         context_data = []
         
         with get_db() as conn:
             cursor = conn.cursor()
             
-            # Get recent predictions with model insights
+            # Get recent predictions with model insights (now including Elo-enhanced models)
             cursor.execute("""
                 SELECT matchup, predicted_pick, confidence_score, calculated_edge, model_version,
-                       projected_score, created_at
+                       projected_score, created_at, sport
                 FROM predictions 
                 ORDER BY created_at DESC 
                 LIMIT 8
             """)
             recent_predictions = cursor.fetchall()
             if recent_predictions:
-                context_data.append("🤖 Recent AI Predictions (LightGBM Model):")
+                context_data.append("🤖 Recent AI Predictions (V5 Elo-Enhanced Ensemble Models):")
                 for pred in recent_predictions:
                     edge_indicator = "🔥" if pred[3] and pred[3] > 4 else "📊"
-                    context_data.append(f"{edge_indicator} {pred[0]}: {pred[1]} ({pred[2]:.1f}% confidence, {pred[3]:.1f}% edge)")
+                    model_type = "🏆" if "elo" in pred[4].lower() else "⚡"
+                    context_data.append(f"{edge_indicator} {pred[0]}: {pred[1]} ({pred[2]:.1f}% confidence, {pred[3]:.1f}% edge) {model_type}")
                     if pred[5]:  # projected_score
-                        context_data.append(f"   Projected: {pred[5]}")
+                        context_data.append(f"   Projected: {pred[5]} | Model: {pred[4]}")
+                context_data.append("")
+            
+            # Get Elo ratings context for top teams
+            cursor.execute("""
+                SELECT t.team_name, t.sport, er.elo_rating
+                FROM elo_ratings er
+                JOIN teams t ON er.team_id = t.team_id
+                WHERE er.date = date('now')
+                ORDER BY er.elo_rating DESC
+                LIMIT 6
+            """)
+            top_elo_teams = cursor.fetchall()
+            if top_elo_teams:
+                context_data.append("🏆 Current Top Elo Ratings (Dynamic Rating Engine):")
+                for team_name, sport, elo_rating in top_elo_teams:
+                    elo_strength = "🔥" if elo_rating > 1600 else "⚡" if elo_rating > 1500 else "📊"
+                    context_data.append(f"   {elo_strength} {team_name} ({sport}): {elo_rating:.1f} Elo")
+                context_data.append("")
+            
+            # Get CLV performance data
+            cursor.execute("""
+                SELECT 
+                    odds_at_tracking, 
+                    closing_line_odds,
+                    sport,
+                    matchup,
+                    bet_date
+                FROM bets 
+                WHERE odds_at_tracking IS NOT NULL 
+                  AND closing_line_odds IS NOT NULL
+                ORDER BY bet_date DESC
+                LIMIT 5
+            """)
+            clv_data = cursor.fetchall()
+            if clv_data:
+                context_data.append("💎 Closing Line Value (CLV) Performance:")
+                total_clv = []
+                for odds_tracking, odds_closing, sport, matchup, bet_date in clv_data:
+                    clv = calculate_clv(odds_tracking, odds_closing)
+                    if clv is not None:
+                        total_clv.append(clv)
+                        clv_indicator = "💎" if clv > 0 else "⚠️"
+                        context_data.append(f"   {clv_indicator} {matchup[:30]}... ({sport}): {clv:+.1f}% CLV")
+                
+                if total_clv:
+                    avg_clv = sum(total_clv) / len(total_clv)
+                    clv_quality = "🌟 Exceptional" if avg_clv > 2 else "✅ Positive" if avg_clv > 0 else "🔍 Needs Work"
+                    context_data.append(f"   Average CLV: {avg_clv:+.1f}% ({clv_quality})")
                 context_data.append("")
             
             # Get comprehensive betting performance analytics
@@ -1170,7 +1219,7 @@ async def query_betai(query: BetAIQuery):
                 total_risked = performance[1] * performance[5] if performance[5] > 0 else 0
                 roi = (performance[0] / total_risked * 100) if total_risked > 0 else 0
                 
-                context_data.append("📊 Performance Analytics:")
+                context_data.append("📊 Quantitative Performance Analytics:")
                 context_data.append(f"   Overall P&L: ${performance[0]:.2f} (ROI: {roi:.1f}%)")
                 context_data.append(f"   Record: {performance[2]}-{performance[3]}-{performance[4]} ({win_rate:.1f}% win rate)")
                 context_data.append(f"   Best Win: ${performance[6]:.2f} | Worst Loss: ${performance[7]:.2f}")
@@ -1179,10 +1228,10 @@ async def query_betai(query: BetAIQuery):
             
             # Get recent betting activity with outcomes
             cursor.execute("""
-                SELECT matchup, bet_type, stake, odds, status, profit_loss, created_at
+                SELECT matchup, bet_type, stake, odds, status, profit_loss, created_at, sport
                 FROM bets 
                 ORDER BY created_at DESC 
-                LIMIT 8
+                LIMIT 6
             """)
             recent_bets = cursor.fetchall()
             if recent_bets:
@@ -1190,7 +1239,8 @@ async def query_betai(query: BetAIQuery):
                 for bet in recent_bets:
                     status_emoji = "✅" if bet[4] == "Won" else "❌" if bet[4] == "Lost" else "⏳"
                     pl_text = f" ({bet[5]:+.2f})" if bet[5] != 0 else ""
-                    context_data.append(f"{status_emoji} {bet[0]} ({bet[1]}): ${bet[2]} at {bet[3]:+d}{pl_text}")
+                    sport_emoji = "🏀" if bet[7] == "NBA" else "🏈" if bet[7] == "NFL" else "⚾"
+                    context_data.append(f"{status_emoji} {sport_emoji} {bet[0][:25]}... ({bet[1]}): ${bet[2]} at {bet[3]:+d}{pl_text}")
                 context_data.append("")
             
             # Get current bankroll status
@@ -1203,33 +1253,35 @@ async def query_betai(query: BetAIQuery):
         # Build comprehensive context
         context = "\n".join(context_data) if context_data else "No recent data available."
         
-        # Enhanced system prompt with LightGBM and RAG context
-        system_prompt = f"""You are BetAI, an elite sports betting analyst powered by advanced machine learning. You have access to a state-of-the-art LightGBM prediction model and comprehensive user data.
+        # Enhanced system prompt with V5 Elo and CLV context
+        system_prompt = f"""You are BetAI V5, an elite quantitative sports analyst powered by advanced Dynamic Elo Rating Engine and Closing Line Value validation systems. You have access to state-of-the-art ensemble models with real-time Elo integration and professional-grade CLV tracking.
 
-CURRENT USER DATA & ML INSIGHTS:
+V5 QUANTITATIVE INTELLIGENCE SYSTEMS:
 {context}
 
-CORE CAPABILITIES:
-- Advanced LightGBM model analysis with feature engineering (rolling averages, strength of schedule, head-to-head)
-- Comprehensive betting performance analytics and pattern recognition
-- Strategic bankroll management and risk assessment
-- Real-time prediction interpretation and edge identification
+CORE V5 CAPABILITIES:
+- Dynamic Elo Rating Engine: Real-time team strength calculations with sport-specific parameters
+- Closing Line Value (CLV) Validation: Gold-standard metric for sustainable betting edge
+- Enhanced Ensemble Models: LightGBM + XGBoost with Elo feature integration
+- Professional Performance Analytics: ROI, Sharpe ratios, and advanced risk metrics
+- Strategic bankroll management with quantitative position sizing
 
-ANALYSIS FRAMEWORK:
-1. Data-Driven Insights: Reference specific predictions, confidence scores, and calculated edges
-2. Performance Context: Analyze user's betting patterns, win rates, and ROI trends  
-3. Risk Management: Assess position sizing relative to bankroll and recent performance
-4. Strategic Recommendations: Provide actionable insights based on model outputs and user history
+ANALYSIS FRAMEWORK (V5 PROTOCOLS):
+1. Elo-Driven Insights: Reference current team Elo ratings and strength differentials
+2. CLV Validation: Analyze closing line value performance as edge proof
+3. Model Integration: Explain how Elo features enhance prediction accuracy
+4. Performance Context: Assess user's quantitative metrics and betting patterns
+5. Risk Management: Emphasize disciplined position sizing (1-3% of bankroll)
 
 RESPONSE GUIDELINES:
-- Lead with specific, quantitative insights from the LightGBM model when relevant
-- Reference actual user data and performance metrics
-- Provide strategic context for predictions (why the model favors certain outcomes)
-- Emphasize disciplined bankroll management (1-3% position sizing)
-- Explain edge calculations and confidence thresholds
-- Be concise but comprehensive, focusing on actionable intelligence
+- Lead with quantitative insights from Elo ratings and CLV analysis when relevant
+- Reference specific team Elo differentials and their predictive significance  
+- Explain CLV performance and its importance for long-term profitability
+- Provide strategic context based on V5 enhanced model outputs
+- Emphasize professional-grade risk management and disciplined execution
+- Be concise but comprehensive, focusing on actionable quantitative intelligence
 
-Remember: You're not just analyzing odds - you're providing strategic intelligence based on advanced ML predictions and user-specific performance data."""
+Remember: You're operating at a professional quantitative analyst level - provide strategic intelligence based on advanced Elo dynamics, CLV validation, and ensemble model predictions."""
 
         # Prepare enhanced request to LM Studio
         payload = {
@@ -1245,7 +1297,7 @@ Remember: You're not just analyzing odds - you're providing strategic intelligen
                 }
             ],
             "temperature": 0.7,
-            "max_tokens": 600,
+            "max_tokens": 700,
             "stop": None
         }
         
@@ -1262,50 +1314,54 @@ Remember: You're not just analyzing odds - you're providing strategic intelligen
             ai_response = result.get("choices", [{}])[0].get("message", {}).get("content", "No response from AI")
             return {"response": ai_response}
         else:
-            # Enhanced fallback response with ML context
-            fallback_response = f"""🤖 BetAI (LightGBM Intelligence - Offline Mode)
+            # Enhanced fallback response with V5 context
+            fallback_response = f"""🤖 BetAI V5 (Elo + CLV Intelligence - Offline Mode)
 
-I'm currently running on fallback intelligence while the LM Studio connection is restored. Here's what I can tell you based on your data:
+I'm currently running on fallback intelligence while the LM Studio connection is restored. Here's what I can tell you based on your V5 quantitative systems:
 
 {context}
 
 QUESTION: "{query.message}"
 
-ANALYSIS (Based on Available Data):
-• Our LightGBM model shows recent predictions with confidence scores ranging 68-75%
-• Look for predictions with calculated edge > 4% for stronger value opportunities  
-• Current performance metrics indicate the importance of consistent position sizing
-• Recommend focusing on high-confidence model outputs (>70%) given recent patterns
+V5 ANALYSIS (Based on Available Data):
+• Dynamic Elo Engine shows current team strength rankings with real-time updates
+• CLV validation system tracking closing line performance for sustainable edge proof
+• Enhanced ensemble models now integrate Elo ratings as key predictive features  
+• Look for predictions with calculated edge > 4% AND positive CLV for optimal opportunities
+• Current performance metrics demonstrate the importance of disciplined position sizing
 
-STRATEGIC GUIDANCE:
-• Maintain 1-3% position sizing relative to current bankroll
-• Prioritize predictions with both high confidence AND significant edge calculations
-• Monitor model version updates (currently v2.0-lightgbm) for enhanced accuracy
+QUANTITATIVE GUIDANCE:
+• Maintain 1-3% position sizing relative to current bankroll for optimal Kelly growth
+• Prioritize predictions with strong Elo differentials (>100 points) AND high model confidence
+• Monitor CLV performance - positive CLV indicates sustainable predictive edge
+• Focus on V5 Elo-enhanced model outputs for superior accuracy vs baseline models
 
-For detailed ML model explanations and advanced analysis, please ensure LM Studio is running on localhost:1234."""
+For detailed V5 model explanations, Elo dynamics analysis, and advanced CLV interpretation, please ensure LM Studio is running on localhost:1234."""
             return {"response": fallback_response}
             
     except requests.exceptions.Timeout:
-        return {"response": "⏱️ BetAI response timeout. The AI is processing complex analysis - please try again. Ensure LM Studio has sufficient resources allocated."}
+        return {"response": "⏱️ BetAI V5 response timeout. The quantitative analysis engine is processing complex Elo and CLV calculations - please try again. Ensure LM Studio has sufficient resources allocated."}
     except requests.exceptions.ConnectionError:
-        # Comprehensive offline analysis
+        # Comprehensive offline analysis with V5 features
         try:
-            offline_context = "Unable to retrieve recent data"
+            offline_context = "Unable to retrieve recent V5 quantitative data"
             with get_db() as conn:
                 cursor = conn.cursor()
                 cursor.execute("SELECT running_balance FROM ledger ORDER BY entry_id DESC LIMIT 1")
                 balance = cursor.fetchone()
-                cursor.execute("SELECT COUNT(*) FROM predictions WHERE model_version LIKE '%lightgbm%'")
-                lgb_predictions = cursor.fetchone()
+                cursor.execute("SELECT COUNT(*) FROM elo_ratings WHERE date = date('now')")
+                current_elos = cursor.fetchone()
+                cursor.execute("SELECT COUNT(*) FROM bets WHERE odds_at_tracking IS NOT NULL")
+                clv_bets = cursor.fetchone()
                 
-                if balance and lgb_predictions:
-                    offline_context = f"Current Balance: ${balance[0]:.2f} | LightGBM Predictions Available: {lgb_predictions[0]}"
+                if balance and current_elos and clv_bets:
+                    offline_context = f"V5 Systems: Balance ${balance[0]:.2f} | Current Elo Ratings: {current_elos[0]} teams | CLV Tracked Bets: {clv_bets[0]}"
         except:
-            offline_context = "Limited data access in offline mode"
+            offline_context = "Limited V5 quantitative data access in offline mode"
             
-        return {"response": f"🔌 BetAI is offline. LM Studio connection failed. {offline_context}\n\nPlease start LM Studio on localhost:1234 for full AI analysis capabilities."}
+        return {"response": f"🔌 BetAI V5 is offline. LM Studio connection failed. {offline_context}\n\nPlease start LM Studio on localhost:1234 for full V5 quantitative analysis capabilities with Elo dynamics and CLV validation."}
     except Exception as e:
-        return {"response": f"⚠️ BetAI encountered an analysis error: {str(e)}\n\nThis may indicate a model processing issue. Please verify system resources and try again."}
+        return {"response": f"⚠️ BetAI V5 encountered a quantitative analysis error: {str(e)}\n\nThis may indicate a V5 processing issue. Please verify system resources and try again."}
 
 if __name__ == "__main__":
     import uvicorn
