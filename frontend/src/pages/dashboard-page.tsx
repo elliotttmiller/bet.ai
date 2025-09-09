@@ -1,7 +1,11 @@
+import { useState } from "react"
 import { DashboardStats } from "@/components/dashboard-stats"
 import { PredictionTable } from "@/components/prediction-table"
+import { FilterControls } from "@/components/FilterControls"
 
 export function DashboardPage() {
+  const [selectedSport, setSelectedSport] = useState<string>("NBA")
+
   return (
     <div className="container mx-auto p-6 space-y-8">
       <div className="flex flex-col space-y-2">
@@ -13,7 +17,12 @@ export function DashboardPage() {
       
       <DashboardStats />
       
-      <PredictionTable />
+      <FilterControls 
+        selectedSport={selectedSport}
+        onSportChange={setSelectedSport}
+      />
+      
+      <PredictionTable sport={selectedSport} />
     </div>
   )
 }

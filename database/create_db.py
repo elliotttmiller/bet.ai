@@ -26,6 +26,7 @@ def create_database():
             bet_type TEXT NOT NULL,
             stake REAL NOT NULL,
             odds INTEGER NOT NULL,
+            sport TEXT NOT NULL,
             status TEXT NOT NULL DEFAULT 'Pending',
             profit_loss REAL NOT NULL DEFAULT 0.0,
             brier_score REAL,

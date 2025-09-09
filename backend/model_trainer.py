@@ -28,9 +28,15 @@ load_dotenv()
 
 # Configuration
 DB_PATH = Path(__file__).parent.parent / "database" / "bet_copilot.db"
-LGBM_MODEL_PATH = Path(__file__).parent / "model_lgbm.joblib"
-XGB_MODEL_PATH = Path(__file__).parent / "model_xgb.joblib"
-MODEL_METADATA_PATH = Path(__file__).parent / "model.json"
+
+def get_model_paths(sport: str):
+    """Get sport-specific model file paths."""
+    base_path = Path(__file__).parent
+    return {
+        'lgbm': base_path / f"model_lgbm_{sport.lower()}.joblib",
+        'xgb': base_path / f"model_xgb_{sport.lower()}.joblib", 
+        'metadata': base_path / f"model_{sport.lower()}.json"
+    }
 
 @contextmanager
 def get_db():
@@ -169,13 +175,15 @@ class EnsembleSportsModel:
     State-of-the-art ensemble model using LightGBM + XGBoost for sports prediction
     """
     
-    def __init__(self):
+    def __init__(self, sport: str = "NBA"):
+        self.sport = sport.upper()
         self.lgbm_model = None
         self.xgb_model = None
         self.feature_columns = None
         self.label_encoder = LabelEncoder()
-        self.model_version = "v3.0-ensemble"
+        self.model_version = f"v3.0-ensemble-{self.sport.lower()}"
         self.feature_engineer = AdvancedFeatureEngineer()
+        self.model_paths = get_model_paths(self.sport)
         
         # LightGBM parameters optimized for sports prediction
         self.lgb_params = {
@@ -441,20 +449,23 @@ class EnsembleSportsModel:
         joblib.dump({
             'model': self.lgbm_model,
             'feature_columns': self.feature_columns,
-            'model_version': self.model_version
-        }, LGBM_MODEL_PATH)
+            'model_version': self.model_version,
+            'sport': self.sport
+        }, self.model_paths['lgbm'])
         
         # Save XGBoost model
         joblib.dump({
             'model': self.xgb_model,
             'feature_columns': self.feature_columns,
-            'model_version': self.model_version
-        }, XGB_MODEL_PATH)
+            'model_version': self.model_version,
+            'sport': self.sport
+        }, self.model_paths['xgb'])
         
         # Save metadata
         metadata = {
             'model_version': self.model_version,
             'model_type': 'Ensemble (LightGBM + XGBoost)',
+            'sport': self.sport,
             'num_features': len(self.feature_columns),
             'feature_columns': self.feature_columns,
             'lgb_params': self.lgb_params,
@@ -462,24 +473,26 @@ class EnsembleSportsModel:
             'trained_at': datetime.now().isoformat()
         }
         
-        with open(MODEL_METADATA_PATH, 'w') as f:
+        with open(self.model_paths['metadata'], 'w') as f:
             json.dump(metadata, f, indent=2)
         
-        print(f"💾 LightGBM model saved to: {LGBM_MODEL_PATH}")
-        print(f"💾 XGBoost model saved to: {XGB_MODEL_PATH}")
-        print(f"📋 Metadata saved to: {MODEL_METADATA_PATH}")
+        print(f"💾 LightGBM model saved to: {self.model_paths['lgbm']}")
+        print(f"💾 XGBoost model saved to: {self.model_paths['xgb']}")
+        print(f"📋 Metadata saved to: {self.model_paths['metadata']}")
     
     @classmethod
-    def load_models(cls):
-        """Load both previously trained models."""
-        if not LGBM_MODEL_PATH.exists() or not XGB_MODEL_PATH.exists():
+    def load_models(cls, sport: str = "NBA"):
+        """Load both previously trained models for a specific sport."""
+        model_paths = get_model_paths(sport)
+        
+        if not model_paths['lgbm'].exists() or not model_paths['xgb'].exists():
             return None
         
         try:
-            lgbm_data = joblib.load(LGBM_MODEL_PATH)
-            xgb_data = joblib.load(XGB_MODEL_PATH)
+            lgbm_data = joblib.load(model_paths['lgbm'])
+            xgb_data = joblib.load(model_paths['xgb'])
             
-            instance = cls()
+            instance = cls(sport)
             instance.lgbm_model = lgbm_data['model']
             instance.xgb_model = xgb_data['model']
             instance.feature_columns = lgbm_data['feature_columns']
@@ -490,19 +503,19 @@ class EnsembleSportsModel:
             print(f"Error loading models: {e}")
             return None
 
-def generate_predictions():
+def generate_predictions(sport: str = "NBA"):
     """Generate predictions for upcoming games using ensemble model."""
-    print("🎯 Generating Ensemble Predictions (LightGBM + XGBoost)...")
+    print(f"🎯 Generating {sport} Ensemble Predictions (LightGBM + XGBoost)...")
     
     # Load or train model
-    model = EnsembleSportsModel.load_models()
+    model = EnsembleSportsModel.load_models(sport)
     if model is None:
-        print("   No trained models found. Training new ensemble...")
-        model = EnsembleSportsModel()
+        print(f"   No trained {sport} models found. Training new ensemble...")
+        model = EnsembleSportsModel(sport)
         model.train()
         model.save_model()
     else:
-        print(f"   Loaded existing ensemble models: {model.model_version}")
+        print(f"   Loaded existing {sport} ensemble models: {model.model_version}")
     
     # Generate sample predictions for upcoming games
     upcoming_games = [
@@ -590,20 +603,22 @@ def generate_predictions():
     print(f"   📊 Generated {predictions_generated} new predictions")
     print(f"   🤖 Model: {model.model_version}")
 
-def train_model():
-    """Train the ensemble model and generate predictions."""
-    print("🚀 Starting Advanced Ensemble Training Pipeline...")
+def train_model(sport: str = "NBA"):
+    """Train the ensemble model and generate predictions for a specific sport."""
+    print(f"🚀 Starting Advanced {sport} Ensemble Training Pipeline...")
     
     # Train model
-    model = EnsembleSportsModel()
+    model = EnsembleSportsModel(sport)
     training_results = model.train()
     model.save_model()
     
     # Generate predictions
-    generate_predictions()
+    generate_predictions(sport)
     
-    print("🎯 Ensemble Training Pipeline Complete!")
+    print(f"🎯 {sport} Ensemble Training Pipeline Complete!")
     return training_results
 
 if __name__ == "__main__":
-    train_model()
+    import sys
+    sport = sys.argv[1] if len(sys.argv) > 1 else "NBA"
+    train_model(sport)

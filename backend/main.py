@@ -59,6 +59,7 @@ class BetCreate(BaseModel):
     bet_type: str = Field(..., min_length=1, max_length=100)
     stake: float = Field(..., gt=0)
     odds: int = Field(..., ge=-1000, le=1000)
+    sport: str = Field(..., min_length=1, max_length=10)
 
 class BetSettle(BaseModel):
     result: str = Field(..., pattern="^(Won|Lost)$")
@@ -69,6 +70,7 @@ class BetResponse(BaseModel):
     bet_type: str
     stake: float
     odds: int
+    sport: str
     status: str
     profit_loss: float
     bet_date: str
@@ -449,9 +451,9 @@ async def create_bet(bet: BetCreate):
         
         # Insert bet
         cursor.execute("""
-            INSERT INTO bets (matchup, bet_type, stake, odds, bet_date, created_at, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
-        """, (bet.matchup, bet.bet_type, bet.stake, bet.odds, now, now, now))
+            INSERT INTO bets (matchup, bet_type, stake, odds, sport, bet_date, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        """, (bet.matchup, bet.bet_type, bet.stake, bet.odds, bet.sport.upper(), now, now, now))
         
         bet_id = cursor.lastrowid
         
@@ -564,35 +566,46 @@ def calculate_edge(model_probability: float, market_odds: int) -> Optional[float
         return None
 
 @app.get("/api/predictions", response_model=List[PredictionResponse])
-async def get_predictions(limit: int = 10):
+async def get_predictions(sport: str, limit: int = 10):
     """Get AI-generated ensemble predictions with live odds integration and edge calculation."""
+    # Validate sport parameter
+    valid_sports = ["NBA", "NFL", "MLB"]
+    sport = sport.upper()
+    if sport not in valid_sports:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid sport. Must be one of: {', '.join(valid_sports)}"
+        )
+    
     with get_db() as conn:
         cursor = conn.cursor()
         
-        # Get existing predictions
+        # Get existing predictions for the specified sport
         cursor.execute("""
             SELECT * FROM predictions 
+            WHERE sport = ?
             ORDER BY created_at DESC 
             LIMIT ?
-        """, (limit,))
+        """, (sport, limit,))
         
         rows = cursor.fetchall()
         
         # If no predictions exist, generate new ones
         if not rows:
-            logger.info("No predictions found, generating new ensemble predictions...")
+            logger.info(f"No {sport} predictions found, generating new ensemble predictions...")
             try:
                 trainer_path = Path(__file__).parent / "model_trainer.py"
-                result = subprocess.run([sys.executable, str(trainer_path)], 
+                result = subprocess.run([sys.executable, str(trainer_path), sport], 
                                       capture_output=True, text=True, timeout=120)
                 
                 if result.returncode == 0:
-                    logger.info("✅ Ensemble model training completed successfully")
+                    logger.info(f"✅ {sport} ensemble model training completed successfully")
                     cursor.execute("""
                         SELECT * FROM predictions 
+                        WHERE sport = ?
                         ORDER BY created_at DESC 
                         LIMIT ?
-                    """, (limit,))
+                    """, (sport, limit,))
                     rows = cursor.fetchall()
                 else:
                     logger.warning("⚠️ Model training failed, using fallback predictions")

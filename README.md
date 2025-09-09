@@ -1,97 +1,128 @@
-# 🎯 Bet.AI - Advanced Betting Analytics Platform
+# 🏆 Bet.AI - Multi-Sport Analytics Platform
 
-> **Enterprise-Grade Betting Performance Tracking & Analytics System**
+> **Enterprise-Grade Multi-Sport Betting Performance Tracking & AI-Powered Analytics System**
 
-Welcome to Bet.AI, a comprehensive betting analytics platform built with modern web technologies following enterprise software development protocols. This repository contains the complete Alpha build of the Bet Copilot system.
+Welcome to Bet.AI, a comprehensive multi-sport betting analytics platform built with modern web technologies following enterprise software development protocols. This repository contains the complete V2 build of the Bet Copilot system with advanced multi-sport intelligence.
 
 ## 🚀 Live Demo
 
-![Bet Copilot Dashboard](https://github.com/user-attachments/assets/c8953f59-4b98-45c3-a52d-b5b83e9fd69f)
+![Multi-Sport Dashboard](https://github.com/user-attachments/assets/ec11d2f3-d1cc-4a54-a7ee-8e179c68edf0)
 
-*Professional dashboard with real-time performance tracking*
+*Professional multi-sport dashboard with intelligent sport filtering and AI predictions*
 
-![Bet Form Interface](https://github.com/user-attachments/assets/a85ec237-4572-4daa-970b-a00758e4e708)
+## ⚡ Multi-Sport Architecture
 
-*Intuitive bet placement with form validation*
+**NEW: Multi-Sport Intelligence Engine** - The system now supports NBA, NFL, and MLB with sport-specific AI models and dynamic filtering:
+
+- **🏀 NBA**: Advanced basketball analytics with ensemble LightGBM + XGBoost models
+- **🏈 NFL**: Professional football predictions with sport-specific feature engineering  
+- **⚾ MLB**: Baseball analytics (expandable architecture ready)
+- **🎯 Sport-Aware UI**: Dynamic filtering with seamless sport switching
+- **🤖 Sport-Specific AI Models**: Separate ensemble models trained for each sport
 
 ## 📁 Project Structure
 
 ```
-bet_copilot/           # Complete Alpha Build
-├── backend/          # FastAPI + Python
-├── database/         # SQLite with business logic
-├── frontend/         # React + Vite dashboard
-└── README.md         # Detailed documentation
+bet.ai/                 # Multi-Sport Analytics Platform
+├── backend/           # FastAPI + Python
+│   ├── model_lgbm_nba.joblib    # NBA-specific LightGBM model
+│   ├── model_xgb_nfl.joblib     # NFL-specific XGBoost model
+│   └── main.py        # Sport-aware API endpoints
+├── database/          # Sport-aware SQLite schema
+├── frontend/          # React + Sport Filtering UI
+└── README.md          # Enhanced multi-sport docs
 ```
 
-## ⚡ Quick Start
+## 🏗️ Architecture Highlights
 
-1. **Navigate to the project:**
-   ```bash
-   cd bet_copilot/
-   ```
+- **Multi-Sport Database**: Sport column in all relevant tables for data isolation
+- **Sport-Specific AI Models**: Separate ensemble models (LightGBM + XGBoost) for each sport
+- **Dynamic API Endpoints**: `/api/predictions?sport=NBA` with sport parameter validation
+- **Intelligent UI Filtering**: Sport selector with real-time data switching
+- **Modern Tech Stack**: FastAPI, React, SQLite, Advanced ML Models
+- **Performance Optimized**: Target hardware constraints with 8GB VRAM models
 
-2. **Initialize database:**
+## 📊 Core Features
+
+✅ **Multi-sport prediction engine** (NBA, NFL, MLB-ready)  
+✅ **Sport-specific ensemble AI models**  
+✅ **Dynamic sport filtering in dashboard**  
+✅ **Real-time performance dashboards**  
+✅ **Advanced feature engineering** (rolling averages, strength of schedule)  
+✅ **American odds calculation engine**  
+✅ **Sport-aware transaction ledger**  
+✅ **Professional dark-themed UI**  
+✅ **Complete API documentation**  
+
+## 🎯 Technology Stack
+
+- **Backend**: FastAPI, Pydantic, SQLite, LightGBM, XGBoost
+- **Frontend**: React 18, TypeScript, Shadcn/UI, Sport Filtering
+- **AI/ML**: Ensemble Models (LightGBM + XGBoost), Advanced Feature Engineering
+- **Database**: Sport-aware SQLite schema with integrity constraints
+
+## 🚀 Quick Start
+
+1. **Initialize sport-aware database:**
    ```bash
    cd database && python create_db.py
    ```
 
-3. **Start frontend:**
+2. **Train sport-specific models:**
+   ```bash
+   cd backend && python model_trainer.py NBA
+   cd backend && python model_trainer.py NFL
+   ```
+
+3. **Start backend with multi-sport API:**
+   ```bash
+   cd backend && python main.py
+   ```
+
+4. **Start frontend with sport filtering:**
    ```bash
    cd frontend && npm install && npm run dev
    ```
 
-4. **Demo the backend:**
-   ```bash
-   python demo_backend.py
-   ```
+## 🤖 Multi-Sport AI Intelligence
 
-## 🏗️ Architecture Highlights
+The system features state-of-the-art ensemble AI models:
 
-- **Three-Tier Architecture**: Database → API → Frontend
-- **Enterprise Patterns**: Clean code, type safety, error handling
-- **Modern Stack**: FastAPI, React, SQLite, Vite
-- **Performance Optimized**: Target hardware constraints considered
-- **Production Ready**: Comprehensive logging, validation, documentation
+- **Sport-Specific Training**: Each sport (NBA, NFL) has dedicated model files
+- **Advanced Feature Engineering**: Rolling averages, strength of schedule, head-to-head analysis
+- **Ensemble Architecture**: LightGBM + XGBoost combination for superior accuracy
+- **Edge Calculation**: Automated +EV opportunity identification
+- **Model Versioning**: `v3.0-ensemble-nba`, `v3.0-ensemble-nfl` tracking
 
-## 📊 Core Features
+## 📈 API Endpoints
 
-✅ Real-time performance dashboards  
-✅ American odds calculation engine  
-✅ Immutable transaction ledger  
-✅ Responsive design (mobile-first)  
-✅ Form validation & error handling  
-✅ Professional UI/UX design  
-✅ Complete API documentation  
-✅ Database integrity constraints  
+### Multi-Sport Predictions
+```bash
+GET /api/predictions?sport=NBA&limit=10
+GET /api/predictions?sport=NFL&limit=10
+```
 
-## 🎯 Technology Stack
-
-- **Backend**: FastAPI, Pydantic, SQLite, Uvicorn
-- **Frontend**: React 18, Vite, CSS3, PropTypes
-- **Database**: SQLite with optimized schema
-- **Development**: Modern ES6+, Async/Await, Git
-
-## 📈 Business Logic
-
-The system implements sophisticated betting analytics:
-
-- **P/L Calculation**: Handles American odds (+150, -110)
-- **ROI Tracking**: Percentage return on investment
-- **Win Rate**: Statistical performance analysis
-- **Bankroll Management**: Complete transaction history
+### Sport-Aware Betting
+```bash
+POST /api/bets
+{
+  "matchup": "Lakers vs Warriors",
+  "bet_type": "ML",
+  "stake": 100,
+  "odds": -150,
+  "sport": "NBA"
+}
+```
 
 ## 🔧 Development Notes
 
-This Alpha build demonstrates:
-- Complete end-to-end functionality
-- Enterprise-grade code quality
-- Modern development practices
-- Scalable architecture patterns
-- Professional documentation
-
-For detailed setup instructions and API documentation, see `bet_copilot/README.md`.
+This V2 multi-sport build demonstrates:
+- **Surgical Architecture Evolution**: Minimal changes for maximum functionality
+- **Sport-Specific Intelligence**: Dedicated models per sport
+- **Seamless UI Experience**: Dynamic filtering without page reloads  
+- **Enterprise-Grade Code**: Maintains all existing quality standards
+- **Scalable Design**: Ready for additional sports (MLB, NHL, etc.)
 
 ---
 
-**Bet.AI Alpha v1.0** - Built with React + FastAPI following Core Protocols V6
+**Bet.AI V2.0** - Multi-Sport Intelligence Platform Built with React + FastAPI following Core Protocols V6

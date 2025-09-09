@@ -2,13 +2,12 @@ import { useState, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { 
-  DollarSign, 
   TrendingUp, 
   Target, 
   BarChart3,
-  Wallet,
-  Activity
+  Wallet
 } from "lucide-react"
+import { apiClient } from "@/lib/api-client"
 
 interface DashboardStats {
   current_balance: number
@@ -31,11 +30,7 @@ export function DashboardStats() {
   const fetchStats = async () => {
     try {
       setLoading(true)
-      const response = await fetch('http://localhost:8001/api/dashboard/stats')
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`)
-      }
-      const data = await response.json()
+      const data = await apiClient.getDashboardStats()
       setStats(data)
     } catch (error) {
       console.error('Error fetching stats:', error)

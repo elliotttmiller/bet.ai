@@ -11,6 +11,7 @@ import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { TrendingUp, TrendingDown, Target } from "lucide-react"
+import { apiClient } from "@/lib/api-client"
 
 interface Prediction {
   prediction_id: number
@@ -23,28 +24,28 @@ interface Prediction {
   predicted_pick: string
   predicted_odds: number
   confidence_score: number
-  projected_score?: string
-  calculated_edge?: number
+  projected_score?: string | null
+  calculated_edge?: number | null
   created_at: string
 }
 
-export function PredictionTable() {
+interface PredictionTableProps {
+  sport: string
+}
+
+export function PredictionTable({ sport }: PredictionTableProps) {
   const [predictions, setPredictions] = useState<Prediction[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     fetchPredictions()
-  }, [])
+  }, [sport])  // Re-fetch when sport changes
 
   const fetchPredictions = async () => {
     try {
       setLoading(true)
-      const response = await fetch('http://localhost:8001/api/predictions')
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`)
-      }
-      const data = await response.json()
+      const data = await apiClient.getPredictions(sport)
       setPredictions(data)
     } catch (error) {
       console.error('Error fetching predictions:', error)
@@ -73,7 +74,7 @@ export function PredictionTable() {
     return <Badge variant="outline">Low</Badge>
   }
 
-  const getEdgeIcon = (edge?: number) => {
+  const getEdgeIcon = (edge?: number | null) => {
     if (!edge) return null
     return edge > 3 ? <TrendingUp className="h-4 w-4 text-green-500" /> : <TrendingDown className="h-4 w-4 text-yellow-500" />
   }
@@ -123,7 +124,7 @@ export function PredictionTable() {
         <CardTitle className="flex items-center justify-between">
           <div className="flex items-center">
             <Target className="mr-2 h-5 w-5" />
-            AI Predictions
+            {sport} AI Predictions
           </div>
           <Button onClick={fetchPredictions} variant="outline" size="sm">
             Refresh

@@ -17,7 +17,7 @@ type PostResponse<T extends keyof ApiPaths> =
     ? R
     : never
 
-const API_BASE = 'http://localhost:8001'
+const API_BASE = 'http://localhost:8000'
 
 class ApiError extends Error {
   constructor(public status: number, message: string, public response?: any) {
@@ -60,8 +60,8 @@ export const apiClient = {
   },
 
   // Predictions
-  getPredictions(): Promise<GetResponse<'/api/predictions'>> {
-    return apiRequest('/api/predictions')
+  getPredictions(sport: string, limit: number = 10): Promise<GetResponse<'/api/predictions'>> {
+    return apiRequest(`/api/predictions?sport=${encodeURIComponent(sport)}&limit=${limit}`)
   },
 
   // Bets/Tracking
