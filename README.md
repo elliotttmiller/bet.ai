@@ -35,12 +35,14 @@ bet.ai/                 # Multi-Sport Analytics Platform
 
 ## 🏗️ Architecture Highlights
 
+- **Containerized Deployment**: Complete Docker Compose stack for one-command deployment
 - **Multi-Sport Database**: Sport column in all relevant tables for data isolation
 - **Sport-Specific AI Models**: Separate ensemble models (LightGBM + XGBoost) for each sport
 - **Dynamic API Endpoints**: `/api/predictions?sport=NBA` with sport parameter validation
 - **Intelligent UI Filtering**: Sport selector with real-time data switching
 - **Modern Tech Stack**: FastAPI, React, SQLite, Advanced ML Models
 - **Performance Optimized**: Target hardware constraints with 8GB VRAM models
+- **Production Ready**: Multi-stage Docker builds with health checks and volume persistence
 
 ## 📊 Core Features
 
@@ -57,11 +59,69 @@ bet.ai/                 # Multi-Sport Analytics Platform
 ## 🎯 Technology Stack
 
 - **Backend**: FastAPI, Pydantic, SQLite, LightGBM, XGBoost
-- **Frontend**: React 18, TypeScript, Shadcn/UI, Sport Filtering
+- **Frontend**: React 18, TypeScript, Shadcn/UI, Sport Filtering  
 - **AI/ML**: Ensemble Models (LightGBM + XGBoost), Advanced Feature Engineering
 - **Database**: Sport-aware SQLite schema with integrity constraints
+- **Deployment**: Docker Compose with multi-stage builds and persistent volumes
+- **Infrastructure**: Containerized microservices with health monitoring
+
+## 🐳 Deployment & Infrastructure
+
+### Docker Compose Stack
+- **Backend Service**: Python 3.11-slim with FastAPI and ML dependencies
+- **Frontend Service**: Node.js 18-alpine with multi-stage build optimization  
+- **Persistent Storage**: Automatic volume mounting for database and models
+- **Health Monitoring**: Built-in health checks for both services
+- **Network Configuration**: Host networking for LM Studio integration
+
+### Volume Management
+- `./database:/app/database` - SQLite database persistence
+- `./backend/models:/app/models` - Trained ML models persistence
+
+### Environment Configuration
+Configure deployment via `.env` file:
+```env
+LM_STUDIO_API_URL=http://localhost:1234/v1/chat/completions
+ODDS_API_KEY=your_odds_api_key_here
+ENABLE_SCHEDULER=true
+```
 
 ## 🚀 Quick Start
+
+### 🐳 One-Command Docker Deployment (Recommended)
+
+**Deploy the entire application stack with a single command:**
+
+```bash
+docker compose up -d --build
+```
+
+This command will:
+- Build optimized Docker images for both backend and frontend
+- Start all services with persistent data volumes
+- Make the application accessible in your browser
+- Ensure data persistence across container restarts
+
+**To stop the application:**
+```bash
+docker compose down
+```
+
+**Application URLs:**
+- **Frontend**: http://localhost:3000
+- **Backend API**: http://localhost:8000
+- **API Documentation**: http://localhost:8000/docs
+
+### 📊 Container Architecture
+
+- **Backend Container**: FastAPI + Python with multi-sport AI models
+- **Frontend Container**: Vite React app with production optimization
+- **Persistent Volumes**: Database and trained models automatically preserved
+- **Network Configuration**: Host networking for LM Studio connectivity
+
+### 🔧 Manual Development Setup (Optional)
+
+For development or local testing without Docker:
 
 1. **Initialize sport-aware database:**
    ```bash

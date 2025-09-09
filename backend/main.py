@@ -48,7 +48,8 @@ app.add_middleware(
 )
 
 # Database path and API configuration
-DB_PATH = Path(__file__).parent.parent / "database" / "bet_copilot.db"
+# Support both local development and containerized deployment
+DB_PATH = Path(os.getenv("DB_PATH", str(Path(__file__).parent.parent / "database" / "bet_copilot.db")))
 LM_STUDIO_API_URL = os.getenv("LM_STUDIO_API_URL", "http://localhost:1234/v1/chat/completions")
 ODDS_API_KEY = os.getenv("ODDS_API_KEY", "")
 ODDS_API_URL = os.getenv("ODDS_API_URL", "https://api.the-odds-api.com/v4")
