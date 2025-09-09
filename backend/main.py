@@ -73,6 +73,8 @@ class BetResponse(BaseModel):
     sport: str
     status: str
     profit_loss: float
+    odds_at_tracking: Optional[float] = None
+    closing_line_odds: Optional[float] = None
     bet_date: str
     created_at: str
     updated_at: str
@@ -125,6 +127,9 @@ class PerformanceHistory(BaseModel):
     worst_day: float
     avg_brier_score: float
     total_predictions_scored: int
+    average_clv: Optional[float] = None
+    average_clv_by_sport: Dict[str, float] = {}
+    elo_history_sample: List[Dict] = []
 
 # Database context manager
 @contextmanager
@@ -174,26 +179,211 @@ async def run_data_pipeline():
         logger.error(f"❌ Data pipeline error: {e}")
 
 async def run_model_training():
-    """Autonomous model training execution."""
+    """Autonomous model training execution with Elo rating engine integration."""
     try:
-        logger.info("🤖 Starting autonomous model training...")
+        logger.info("🤖 Starting autonomous model training pipeline...")
+        
+        # Step 1: Run Elo Calculator to update ratings
+        logger.info("   Step 1: Running Dynamic Elo Rating Engine...")
+        elo_path = Path(__file__).parent / "elo_calculator.py"
+        elo_result = subprocess.run([sys.executable, str(elo_path)], 
+                                  capture_output=True, text=True, timeout=300)
+        
+        if elo_result.returncode == 0:
+            logger.info("   ✅ Elo ratings updated successfully")
+        else:
+            logger.warning(f"   ⚠️ Elo calculator warning: {elo_result.stderr}")
+        
+        # Step 2: Run Model Training (now with Elo features)
+        logger.info("   Step 2: Running enhanced model training...")
         trainer_path = Path(__file__).parent / "model_trainer.py"
         result = subprocess.run([sys.executable, str(trainer_path)], 
                               capture_output=True, text=True, timeout=600)
         
         if result.returncode == 0:
-            logger.info("✅ Model training completed successfully")
+            logger.info("✅ Enhanced model training pipeline completed successfully")
         else:
             logger.error(f"❌ Model training failed: {result.stderr}")
     except Exception as e:
-        logger.error(f"❌ Model training error: {e}")
+        logger.error(f"❌ Model training pipeline error: {e}")
 
 def calculate_brier_score(predicted_probability: float, actual_outcome: bool) -> float:
     """Calculate Brier score for a probabilistic prediction."""
     outcome_value = 1.0 if actual_outcome else 0.0
     return (predicted_probability - outcome_value) ** 2
 
+async def update_closing_line_odds():
+    """Fetch and update closing line odds for tracked games (runs every 15 minutes)."""
+    try:
+        logger.info("🔍 Updating closing line odds for tracked games...")
+        
+        with get_db() as conn:
+            cursor = conn.cursor()
+            
+            # Find bets with odds_at_tracking but no closing_line_odds that are near game time
+            cursor.execute("""
+                SELECT bet_id, matchup, sport, odds_at_tracking, bet_date
+                FROM bets 
+                WHERE odds_at_tracking IS NOT NULL 
+                  AND closing_line_odds IS NULL
+                  AND status = 'Pending'
+                  AND datetime(bet_date) <= datetime('now', '+4 hours')
+                  AND datetime(bet_date) >= datetime('now', '-1 hour')
+            """)
+            
+            pending_bets = cursor.fetchall()
+            
+            if not pending_bets:
+                logger.info("   No bets requiring closing line odds updates")
+                return
+            
+            logger.info(f"   Found {len(pending_bets)} bets requiring closing odds updates")
+            
+            # For demonstration, simulate closing line odds (in production, call odds API)
+            import random
+            random.seed(42)
+            
+            for bet in pending_bets:
+                bet_id, matchup, sport, odds_at_tracking, bet_date = bet
+                
+                # Simulate realistic closing line movement (±10% typical)
+                original_odds = odds_at_tracking
+                movement_factor = 1 + random.uniform(-0.10, 0.10)
+                closing_odds = round(original_odds * movement_factor)
+                
+                # Ensure odds stay in reasonable bounds
+                if closing_odds > 0:
+                    closing_odds = max(100, min(1000, closing_odds))
+                else:
+                    closing_odds = max(-1000, min(-100, closing_odds))
+                
+                # Update closing line odds
+                cursor.execute("""
+                    UPDATE bets 
+                    SET closing_line_odds = ?, updated_at = ?
+                    WHERE bet_id = ?
+                """, (float(closing_odds), datetime.now().isoformat(), bet_id))
+                
+                logger.info(f"   Updated bet #{bet_id}: {matchup} - Tracking: {odds_at_tracking:+.0f}, Closing: {closing_odds:+.0f}")
+            
+            conn.commit()
+            logger.info("✅ Closing line odds update complete")
+        
+    except Exception as e:
+        logger.error(f"❌ Closing line odds update failed: {e}")
+
 async def audit_settled_predictions():
+    """Audit settled predictions and calculate Brier scores."""
+    try:
+        logger.info("🔍 Starting automated prediction auditing...")
+        
+        with get_db() as conn:
+            cursor = conn.cursor()
+            
+            # Find predictions that need auditing (game date has passed but still pending)
+            current_time = datetime.now().isoformat()
+            cursor.execute("""
+                SELECT p.prediction_id, p.matchup, p.confidence_score, p.predicted_pick, 
+                       p.game_date, p.team_a, p.team_b
+                FROM predictions p
+                LEFT JOIN bets b ON p.matchup = b.matchup 
+                WHERE p.game_date < ? 
+                AND (b.status = 'Pending' OR b.status IS NULL)
+                AND p.created_at >= datetime('now', '-30 days')
+            """, (current_time,))
+            
+            pending_predictions = cursor.fetchall()
+            
+            if not pending_predictions:
+                logger.info("   No predictions require auditing")
+                return
+            
+            logger.info(f"   Found {len(pending_predictions)} predictions to audit")
+            
+            audited_count = 0
+            
+            for prediction in pending_predictions:
+                prediction_id = prediction[0]
+                matchup = prediction[1]
+                confidence_score = prediction[2]
+                predicted_pick = prediction[3]
+                game_date = prediction[4]
+                team_a = prediction[5]
+                team_b = prediction[6]
+                
+                # For demo purposes, simulate fetching game results
+                # In production, this would call the sports API
+                actual_outcome = simulate_game_result(team_a, team_b, predicted_pick)
+                
+                # Convert confidence to probability (0-1 scale)
+                predicted_probability = confidence_score / 100.0
+                
+                # Calculate Brier score
+                brier_score = calculate_brier_score(predicted_probability, actual_outcome)
+                
+                # Update any related bets
+                cursor.execute("""
+                    SELECT bet_id FROM bets WHERE matchup = ? AND status = 'Pending'
+                """, (matchup,))
+                
+                related_bets = cursor.fetchall()
+                
+                for bet_row in related_bets:
+                    bet_id = bet_row[0]
+                    
+                    # Update bet status and Brier score
+                    new_status = 'Won' if actual_outcome else 'Lost'
+                    
+                    cursor.execute("""
+                        UPDATE bets 
+                        SET status = ?, brier_score = ?, updated_at = ?
+                        WHERE bet_id = ?
+                    """, (new_status, brier_score, current_time, bet_id))
+                    
+                    # Calculate and update profit/loss if won
+                    if actual_outcome:
+                        cursor.execute("SELECT stake, odds FROM bets WHERE bet_id = ?", (bet_id,))
+                        bet_data = cursor.fetchone()
+                        if bet_data:
+                            stake, odds = bet_data
+                            profit = calculate_profit_loss(stake, odds, True)
+                            cursor.execute("""
+                                UPDATE bets SET profit_loss = ? WHERE bet_id = ?
+                            """, (profit, bet_id))
+                            
+                            # Update ledger
+                            current_balance = get_current_balance()
+                            new_balance = current_balance + profit
+                            cursor.execute("""
+                                INSERT INTO ledger (timestamp, transaction_type, amount, running_balance, related_bet_id, description)
+                                VALUES (?, 'Bet Settled', ?, ?, ?, ?)
+                            """, (current_time, profit, new_balance, bet_id, f"Auto-settled winnings for bet #{bet_id}"))
+                
+                audited_count += 1
+            
+            conn.commit()
+            
+            logger.info(f"✅ Auditing complete! Processed {audited_count} predictions")
+            
+    except Exception as e:
+        logger.error(f"❌ Auditing error: {e}")
+
+def simulate_game_result(team_a: str, team_b: str, predicted_pick: str) -> bool:
+    """Simulate game result for demo purposes."""
+    import random
+    
+    # Simple simulation based on team names and prediction
+    # In production, this would fetch actual results from sports API
+    
+    # Create some deterministic randomness based on team names
+    seed = hash(f"{team_a}{team_b}") % 1000
+    random.seed(seed)
+    
+    # Simulate with 60% accuracy for demonstration
+    if "Lakers" in predicted_pick or "Yankees" in predicted_pick or "Patriots" in predicted_pick:
+        return random.random() < 0.65  # Slightly favor certain teams
+    else:
+        return random.random() < 0.55
     """Audit settled predictions and calculate Brier scores."""
     try:
         logger.info("🔍 Starting automated prediction auditing...")
@@ -339,11 +529,20 @@ async def startup_event():
                 replace_existing=True
             )
             
+            # Schedule closing line odds updates every 15 minutes
+            scheduler.add_job(
+                update_closing_line_odds,
+                CronTrigger(minute="*/15"),
+                id="closing_line_odds_update", 
+                replace_existing=True
+            )
+            
             scheduler.start()
             logger.info("🤖 Autonomous scheduling engine initialized")
             logger.info(f"📅 Data pipeline scheduled daily at {data_hour:02d}:00")
             logger.info(f"📅 Model training scheduled weekly on day {training_day} at {training_hour:02d}:00")
             logger.info(f"📅 Prediction auditing scheduled daily at {audit_hour:02d}:00")
+            logger.info(f"📅 Closing line odds updates every 15 minutes")
         except Exception as e:
             logger.error(f"❌ Failed to initialize scheduler: {e}")
     else:
@@ -449,11 +648,11 @@ async def create_bet(bet: BetCreate):
         cursor = conn.cursor()
         now = datetime.now().isoformat()
         
-        # Insert bet
+        # Insert bet with odds_at_tracking for CLV calculation
         cursor.execute("""
-            INSERT INTO bets (matchup, bet_type, stake, odds, sport, bet_date, created_at, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-        """, (bet.matchup, bet.bet_type, bet.stake, bet.odds, bet.sport.upper(), now, now, now))
+            INSERT INTO bets (matchup, bet_type, stake, odds, sport, odds_at_tracking, bet_date, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, (bet.matchup, bet.bet_type, bet.stake, bet.odds, bet.sport.upper(), float(bet.odds), now, now, now))
         
         bet_id = cursor.lastrowid
         
@@ -562,6 +761,24 @@ def calculate_edge(model_probability: float, market_odds: int) -> Optional[float
         implied_probability = calculate_implied_probability(market_odds)
         edge = model_probability - implied_probability
         return round(edge, 2)
+    except:
+        return None
+
+def calculate_clv(odds_at_tracking: float, closing_line_odds: float) -> Optional[float]:
+    """
+    Calculate Closing Line Value (CLV) - the gold standard metric for betting edge.
+    CLV = ((1 / Closing Odds Implied Probability) - (1 / Tracking Odds Implied Probability)) * 100
+    """
+    try:
+        if odds_at_tracking is None or closing_line_odds is None:
+            return None
+        
+        tracking_implied = calculate_implied_probability(int(odds_at_tracking)) / 100
+        closing_implied = calculate_implied_probability(int(closing_line_odds)) / 100
+        
+        # CLV calculation: positive CLV means we got better odds than closing
+        clv = ((1 / closing_implied) - (1 / tracking_implied)) / (1 / tracking_implied) * 100
+        return round(clv, 2)
     except:
         return None
 
@@ -726,7 +943,7 @@ async def get_predictions(sport: str, limit: int = 10):
 
 @app.get("/api/performance/history", response_model=PerformanceHistory)
 async def get_performance_history():
-    """Get historical performance data including Brier scores for visualization."""
+    """Get enhanced performance data with CLV metrics and Elo ratings for visualization."""
     with get_db() as conn:
         cursor = conn.cursor()
         
@@ -773,6 +990,58 @@ async def get_performance_history():
         """)
         
         stats = cursor.fetchone()
+        
+        # Calculate CLV metrics
+        cursor.execute("""
+            SELECT 
+                odds_at_tracking, 
+                closing_line_odds,
+                sport
+            FROM bets 
+            WHERE odds_at_tracking IS NOT NULL 
+              AND closing_line_odds IS NOT NULL
+        """)
+        
+        clv_data = cursor.fetchall()
+        
+        # Calculate overall and sport-specific CLV
+        clv_values = []
+        clv_by_sport = {}
+        
+        for odds_tracking, odds_closing, sport in clv_data:
+            clv = calculate_clv(odds_tracking, odds_closing)
+            if clv is not None:
+                clv_values.append(clv)
+                if sport not in clv_by_sport:
+                    clv_by_sport[sport] = []
+                clv_by_sport[sport].append(clv)
+        
+        average_clv = sum(clv_values) / len(clv_values) if clv_values else None
+        average_clv_by_sport = {
+            sport: sum(values) / len(values) 
+            for sport, values in clv_by_sport.items()
+        }
+        
+        # Get sample Elo history for Lakers (team_id=1) or first available team
+        cursor.execute("""
+            SELECT er.date, er.elo_rating, t.team_name, t.sport
+            FROM elo_ratings er
+            JOIN teams t ON er.team_id = t.team_id
+            WHERE t.team_name = 'Lakers' OR er.team_id = 1
+            ORDER BY er.date DESC
+            LIMIT 30
+        """)
+        
+        elo_history_data = cursor.fetchall()
+        elo_history_sample = [
+            {
+                'date': row[0],
+                'elo_rating': row[1],
+                'team_name': row[2],
+                'sport': row[3]
+            }
+            for row in elo_history_data
+        ]
         
         # Calculate performance metrics
         total_profit_loss = stats[0] if stats else 0.0
@@ -848,7 +1117,10 @@ async def get_performance_history():
             best_day=best_day,
             worst_day=worst_day,
             avg_brier_score=avg_brier_score,
-            total_predictions_scored=total_predictions_scored
+            total_predictions_scored=total_predictions_scored,
+            average_clv=average_clv,
+            average_clv_by_sport=average_clv_by_sport,
+            elo_history_sample=elo_history_sample
         )
 
 @app.post("/api/betai/query")

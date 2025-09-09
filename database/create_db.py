@@ -30,6 +30,8 @@ def create_database():
             status TEXT NOT NULL DEFAULT 'Pending',
             profit_loss REAL NOT NULL DEFAULT 0.0,
             brier_score REAL,
+            odds_at_tracking REAL,
+            closing_line_odds REAL,
             bet_date TEXT NOT NULL,
             created_at TEXT NOT NULL,
             updated_at TEXT NOT NULL,
@@ -96,6 +98,20 @@ def create_database():
             points_allowed INTEGER NOT NULL DEFAULT 0,
             last_updated TEXT NOT NULL,
             FOREIGN KEY (team_id) REFERENCES teams (team_id)
+        )
+    """)
+    
+    # Create elo_ratings table for Dynamic Elo Rating Engine
+    cursor.execute("""
+        CREATE TABLE elo_ratings (
+            rating_id INTEGER PRIMARY KEY AUTOINCREMENT,
+            team_id INTEGER NOT NULL,
+            sport TEXT NOT NULL,
+            elo_rating REAL NOT NULL DEFAULT 1500.0,
+            date TEXT NOT NULL,
+            created_at TEXT NOT NULL,
+            FOREIGN KEY (team_id) REFERENCES teams (team_id),
+            CONSTRAINT unique_team_sport_date UNIQUE (team_id, sport, date)
         )
     """)
 
