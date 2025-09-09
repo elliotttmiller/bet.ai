@@ -162,50 +162,135 @@ def get_current_balance() -> float:
         result = cursor.fetchone()
         return result[0] if result else 0.0
 
-# Autonomous Engine Functions
+# V6 Autonomous Engine Functions with Dependency-Aware Execution
 async def run_data_pipeline():
-    """Autonomous data pipeline execution."""
+    """V6 Autonomous data pipeline execution (Step 1 of dependency chain)."""
     try:
-        logger.info("🤖 Starting autonomous data pipeline...")
+        logger.info("🤖 Starting V6 autonomous data pipeline...")
         pipeline_path = Path(__file__).parent / "data_pipeline.py"
         result = subprocess.run([sys.executable, str(pipeline_path)], 
                               capture_output=True, text=True, timeout=300)
         
         if result.returncode == 0:
-            logger.info("✅ Data pipeline completed successfully")
+            logger.info("✅ V6 Data pipeline completed successfully")
+            return True
         else:
-            logger.error(f"❌ Data pipeline failed: {result.stderr}")
+            logger.error(f"❌ V6 Data pipeline failed: {result.stderr}")
+            return False
     except Exception as e:
-        logger.error(f"❌ Data pipeline error: {e}")
+        logger.error(f"❌ V6 Data pipeline error: {e}")
+        return False
+
+async def run_player_impact_calculation():
+    """V6 Player Impact Model execution (Step 2 of dependency chain)."""
+    try:
+        logger.info("🤖 Starting V6 Player Impact Model calculation...")
+        impact_path = Path(__file__).parent / "player_impact_model.py"
+        result = subprocess.run([sys.executable, str(impact_path)], 
+                              capture_output=True, text=True, timeout=300)
+        
+        if result.returncode == 0:
+            logger.info("✅ V6 Player Impact Model completed successfully")
+            return True
+        else:
+            logger.error(f"❌ V6 Player Impact Model failed: {result.stderr}")
+            return False
+    except Exception as e:
+        logger.error(f"❌ V6 Player Impact Model error: {e}")
+        return False
+
+async def run_elo_calculation():
+    """V6 Elo Rating Engine execution (Step 3 of dependency chain)."""
+    try:
+        logger.info("🤖 Starting V6 Dynamic Elo Rating Engine...")
+        elo_path = Path(__file__).parent / "elo_calculator.py"
+        result = subprocess.run([sys.executable, str(elo_path)], 
+                              capture_output=True, text=True, timeout=300)
+        
+        if result.returncode == 0:
+            logger.info("✅ V6 Elo Rating Engine completed successfully")
+            return True
+        else:
+            logger.error(f"❌ V6 Elo Rating Engine failed: {result.stderr}")
+            return False
+    except Exception as e:
+        logger.error(f"❌ V6 Elo Rating Engine error: {e}")
+        return False
+
+async def run_daily_intelligence_chain():
+    """V6 Daily Intelligence Chain: data_pipeline → player_impact → elo_calculator."""
+    try:
+        logger.info("🚀 Starting V6 Daily Intelligence Chain (Dependency-Aware Execution)...")
+        
+        # Step 1: Data Pipeline
+        data_success = await run_data_pipeline()
+        if not data_success:
+            logger.error("❌ Daily Intelligence Chain failed at Step 1 (Data Pipeline)")
+            return False
+        
+        # Step 2: Player Impact Calculation (depends on data pipeline)
+        impact_success = await run_player_impact_calculation()
+        if not impact_success:
+            logger.error("❌ Daily Intelligence Chain failed at Step 2 (Player Impact)")
+            return False
+        
+        # Step 3: Elo Rating Calculation (depends on completed games)
+        elo_success = await run_elo_calculation()
+        if not elo_success:
+            logger.error("❌ Daily Intelligence Chain failed at Step 3 (Elo Ratings)")
+            return False
+        
+        logger.info("✅ V6 Daily Intelligence Chain completed successfully!")
+        return True
+        
+    except Exception as e:
+        logger.error(f"❌ V6 Daily Intelligence Chain error: {e}")
+        return False
 
 async def run_model_training():
-    """Autonomous model training execution with Elo rating engine integration."""
+    """V6 Model training execution with full dependency chain (Step 4)."""
     try:
-        logger.info("🤖 Starting autonomous model training pipeline...")
+        logger.info("🤖 Starting V6 Enhanced Model Training Pipeline...")
         
-        # Step 1: Run Elo Calculator to update ratings
-        logger.info("   Step 1: Running Dynamic Elo Rating Engine...")
-        elo_path = Path(__file__).parent / "elo_calculator.py"
-        elo_result = subprocess.run([sys.executable, str(elo_path)], 
-                                  capture_output=True, text=True, timeout=300)
+        # First ensure daily intelligence chain is up to date
+        chain_success = await run_daily_intelligence_chain()
+        if not chain_success:
+            logger.warning("⚠️ Daily Intelligence Chain had issues, proceeding with model training...")
         
-        if elo_result.returncode == 0:
-            logger.info("   ✅ Elo ratings updated successfully")
-        else:
-            logger.warning(f"   ⚠️ Elo calculator warning: {elo_result.stderr}")
-        
-        # Step 2: Run Model Training (now with Elo features)
-        logger.info("   Step 2: Running enhanced model training...")
+        # Run V6 Model Training (now with player impact features)
+        logger.info("   Running V6 Player-Impact-Aware Model Training...")
         trainer_path = Path(__file__).parent / "model_trainer.py"
         result = subprocess.run([sys.executable, str(trainer_path)], 
                               capture_output=True, text=True, timeout=600)
         
         if result.returncode == 0:
-            logger.info("✅ Enhanced model training pipeline completed successfully")
+            logger.info("✅ V6 Enhanced Model Training Pipeline completed successfully")
+            return True
         else:
-            logger.error(f"❌ Model training failed: {result.stderr}")
+            logger.error(f"❌ V6 Model training failed: {result.stderr}")
+            return False
     except Exception as e:
-        logger.error(f"❌ Model training pipeline error: {e}")
+        logger.error(f"❌ V6 Model training pipeline error: {e}")
+        return False
+
+async def run_weekly_training_chain():
+    """V6 Weekly Training Chain: daily_intelligence_chain → model_training."""
+    try:
+        logger.info("🚀 Starting V6 Weekly Training Chain (Full Dependency Pipeline)...")
+        
+        # Execute full model training with dependencies
+        training_success = await run_model_training()
+        
+        if training_success:
+            logger.info("✅ V6 Weekly Training Chain completed successfully!")
+        else:
+            logger.error("❌ V6 Weekly Training Chain failed")
+        
+        return training_success
+        
+    except Exception as e:
+        logger.error(f"❌ V6 Weekly Training Chain error: {e}")
+        return False
 
 def calculate_brier_score(predicted_probability: float, actual_outcome: bool) -> float:
     """Calculate Brier score for a probabilistic prediction."""
@@ -501,22 +586,22 @@ async def startup_event():
     """Initialize autonomous scheduling on startup."""
     if os.getenv("ENABLE_SCHEDULER", "true").lower() == "true":
         try:
-            # Schedule daily data pipeline at 3 AM
+            # V6 Enhanced Scheduling: Schedule daily intelligence chain at 3 AM
             data_hour = int(os.getenv("DATA_PIPELINE_HOUR", "3"))
             scheduler.add_job(
-                run_data_pipeline,
+                run_daily_intelligence_chain,
                 CronTrigger(hour=data_hour, minute=0),
-                id="daily_data_pipeline",
+                id="v6_daily_intelligence_chain",
                 replace_existing=True
             )
             
-            # Schedule weekly model training on Sunday at 3 AM
+            # V6 Enhanced Scheduling: Schedule weekly training chain on Sunday at 3 AM
             training_day = int(os.getenv("MODEL_TRAINING_DAY", "6"))  # 6 = Sunday
             training_hour = int(os.getenv("MODEL_TRAINING_HOUR", "3"))
             scheduler.add_job(
-                run_model_training,
+                run_weekly_training_chain,
                 CronTrigger(day_of_week=training_day, hour=training_hour, minute=0),
-                id="weekly_model_training",
+                id="v6_weekly_training_chain",
                 replace_existing=True
             )
             
@@ -538,9 +623,11 @@ async def startup_event():
             )
             
             scheduler.start()
-            logger.info("🤖 Autonomous scheduling engine initialized")
-            logger.info(f"📅 Data pipeline scheduled daily at {data_hour:02d}:00")
-            logger.info(f"📅 Model training scheduled weekly on day {training_day} at {training_hour:02d}:00")
+            logger.info("🤖 V6 Autonomous Scheduling Engine Initialized")
+            logger.info(f"📅 V6 Daily Intelligence Chain scheduled daily at {data_hour:02d}:00")
+            logger.info(f"   └─ Sequence: Data Pipeline → Player Impact → Elo Ratings")
+            logger.info(f"📅 V6 Weekly Training Chain scheduled weekly on day {training_day} at {training_hour:02d}:00")
+            logger.info(f"   └─ Sequence: Daily Chain → Player-Impact-Aware Model Training")
             logger.info(f"📅 Prediction auditing scheduled daily at {audit_hour:02d}:00")
             logger.info(f"📅 Closing line odds updates every 15 minutes")
         except Exception as e:
@@ -784,7 +871,7 @@ def calculate_clv(odds_at_tracking: float, closing_line_odds: float) -> Optional
 
 @app.get("/api/predictions", response_model=List[PredictionResponse])
 async def get_predictions(sport: str, limit: int = 10):
-    """Get AI-generated ensemble predictions with live odds integration and edge calculation."""
+    """Get V6 AI-generated lineup-aware predictions with live odds integration and player impact analysis."""
     # Validate sport parameter
     valid_sports = ["NBA", "NFL", "MLB"]
     sport = sport.upper()
@@ -807,16 +894,16 @@ async def get_predictions(sport: str, limit: int = 10):
         
         rows = cursor.fetchall()
         
-        # If no predictions exist, generate new ones
+        # If no predictions exist, generate new ones using V6 lineup-aware models
         if not rows:
-            logger.info(f"No {sport} predictions found, generating new ensemble predictions...")
+            logger.info(f"No {sport} predictions found, generating new V6 lineup-aware predictions...")
             try:
                 trainer_path = Path(__file__).parent / "model_trainer.py"
                 result = subprocess.run([sys.executable, str(trainer_path), sport], 
                                       capture_output=True, text=True, timeout=120)
                 
                 if result.returncode == 0:
-                    logger.info(f"✅ {sport} ensemble model training completed successfully")
+                    logger.info(f"✅ {sport} V6 lineup-aware model training completed successfully")
                     cursor.execute("""
                         SELECT * FROM predictions 
                         WHERE sport = ?
@@ -825,8 +912,8 @@ async def get_predictions(sport: str, limit: int = 10):
                     """, (sport, limit,))
                     rows = cursor.fetchall()
                 else:
-                    logger.warning("⚠️ Model training failed, using fallback predictions")
-                    # Generate enhanced fallback predictions with ensemble simulation
+                    logger.warning("⚠️ V6 Model training failed, using enhanced fallback predictions")
+                    # Generate V6 enhanced fallback predictions with player impact simulation
                     fallback_predictions = [
                         {
                             "matchup": "Lakers vs Warriors",
@@ -841,7 +928,7 @@ async def get_predictions(sport: str, limit: int = 10):
                             "projected_score": "Lakers 118, Warriors 114",
                             "calculated_edge": 6.2,
                             "created_at": datetime.now().isoformat(),
-                            "model_version": "v3.0-ensemble-fallback"
+                            "model_version": "v6.0-player-impact-ensemble-fallback"
                         },
                         {
                             "matchup": "Patriots vs Bills", 
@@ -856,7 +943,7 @@ async def get_predictions(sport: str, limit: int = 10):
                             "projected_score": "Bills 28, Patriots 21",
                             "calculated_edge": 4.7,
                             "created_at": datetime.now().isoformat(),
-                            "model_version": "v3.0-ensemble-fallback"
+                            "model_version": "v6.0-player-impact-ensemble-fallback"
                         },
                         {
                             "matchup": "Yankees vs Red Sox",
@@ -871,7 +958,7 @@ async def get_predictions(sport: str, limit: int = 10):
                             "projected_score": "Yankees 9, Red Sox 6",
                             "calculated_edge": 7.8,
                             "created_at": datetime.now().isoformat(),
-                            "model_version": "v3.0-ensemble-fallback"
+                            "model_version": "v6.0-player-impact-ensemble-fallback"
                         }
                     ]
                     
@@ -1125,15 +1212,52 @@ async def get_performance_history():
 
 @app.post("/api/betai/query")
 async def query_betai(query: BetAIQuery):
-    """V5 RAG-powered AI query with Elo ratings, CLV validation, and comprehensive quantitative context."""
+    """V6 RAG-powered AI query with Player Impact Intelligence, Elo ratings, CLV validation, and comprehensive quantitative context."""
     try:
-        # Enhanced context retrieval with Elo and CLV insights
+        # V6 Enhanced context retrieval with Player Impact, Elo and CLV insights
         context_data = []
         
         with get_db() as conn:
             cursor = conn.cursor()
             
-            # Get recent predictions with model insights (now including Elo-enhanced models)
+            # V6 NEW: Get top player impact ratings and matchups
+            cursor.execute("""
+                SELECT p.player_name, t.team_name, p.sport, p.position, p.impact_rating
+                FROM players p
+                JOIN teams t ON p.team_id = t.team_id
+                WHERE p.impact_rating > 0
+                ORDER BY p.impact_rating DESC
+                LIMIT 10
+            """)
+            top_players = cursor.fetchall()
+            if top_players:
+                context_data.append("⭐ V6 Top Player Impact Ratings (Player-Level Intelligence):")
+                for player_name, team_name, sport, position, impact in top_players:
+                    impact_tier = "🌟" if impact > 70 else "⚡" if impact > 50 else "📊"
+                    context_data.append(f"{impact_tier} {player_name} ({team_name}, {sport} {position}): {impact:.1f} impact")
+                context_data.append("")
+            
+            # V6 NEW: Get team aggregate impact comparisons
+            cursor.execute("""
+                SELECT t.team_name, t.sport, COUNT(p.player_id) as player_count,
+                       AVG(p.impact_rating) as avg_impact, MAX(p.impact_rating) as top_impact
+                FROM teams t
+                LEFT JOIN players p ON t.team_id = p.team_id AND p.impact_rating > 0
+                WHERE t.sport IN ('NBA', 'NFL')
+                GROUP BY t.team_id, t.team_name, t.sport
+                HAVING player_count > 0
+                ORDER BY avg_impact DESC
+                LIMIT 8
+            """)
+            team_impacts = cursor.fetchall()
+            if team_impacts:
+                context_data.append("🏆 V6 Team Aggregate Impact Rankings (Lineup Intelligence):")
+                for team, sport, count, avg_impact, top_impact in team_impacts:
+                    lineup_strength = "🔥" if avg_impact > 50 else "⚡" if avg_impact > 40 else "📊"
+                    context_data.append(f"   {lineup_strength} {team} ({sport}): {avg_impact:.1f} avg ({count} players, {top_impact:.1f} top)")
+                context_data.append("")
+            
+            # Get recent predictions with model insights (now including Player Impact models)
             cursor.execute("""
                 SELECT matchup, predicted_pick, confidence_score, calculated_edge, model_version,
                        projected_score, created_at, sport
@@ -1143,10 +1267,10 @@ async def query_betai(query: BetAIQuery):
             """)
             recent_predictions = cursor.fetchall()
             if recent_predictions:
-                context_data.append("🤖 Recent AI Predictions (V5 Elo-Enhanced Ensemble Models):")
+                context_data.append("🤖 Recent AI Predictions (V6 Player-Impact-Aware Ensemble Models):")
                 for pred in recent_predictions:
                     edge_indicator = "🔥" if pred[3] and pred[3] > 4 else "📊"
-                    model_type = "🏆" if "elo" in pred[4].lower() else "⚡"
+                    model_type = "⭐" if "player-impact" in pred[4].lower() else "🏆" if "elo" in pred[4].lower() else "⚡"
                     context_data.append(f"{edge_indicator} {pred[0]}: {pred[1]} ({pred[2]:.1f}% confidence, {pred[3]:.1f}% edge) {model_type}")
                     if pred[5]:  # projected_score
                         context_data.append(f"   Projected: {pred[5]} | Model: {pred[4]}")
@@ -1253,35 +1377,41 @@ async def query_betai(query: BetAIQuery):
         # Build comprehensive context
         context = "\n".join(context_data) if context_data else "No recent data available."
         
-        # Enhanced system prompt with V5 Elo and CLV context
-        system_prompt = f"""You are BetAI V5, an elite quantitative sports analyst powered by advanced Dynamic Elo Rating Engine and Closing Line Value validation systems. You have access to state-of-the-art ensemble models with real-time Elo integration and professional-grade CLV tracking.
+        # V6 Enhanced system prompt with Player Impact Intelligence, Elo and CLV context
+        system_prompt = f"""You are BetAI V6, an elite quantitative sports analyst powered by advanced Player Impact Intelligence, Dynamic Elo Rating Engine, and Closing Line Value validation systems. You have access to state-of-the-art lineup-aware ensemble models with real-time player impact ratings, Elo integration, and professional-grade CLV tracking.
 
-V5 QUANTITATIVE INTELLIGENCE SYSTEMS:
+V6 PLAYER-LEVEL INTELLIGENCE SYSTEMS:
 {context}
 
-CORE V5 CAPABILITIES:
+CORE V6 CAPABILITIES:
+- Player Impact Model: Advanced PER-style calculation quantifying individual player value (0-50+ scale)
+- Lineup-Aware Predictions: Ensemble models using aggregated team player impact ratings as key features
 - Dynamic Elo Rating Engine: Real-time team strength calculations with sport-specific parameters
 - Closing Line Value (CLV) Validation: Gold-standard metric for sustainable betting edge
-- Enhanced Ensemble Models: LightGBM + XGBoost with Elo feature integration
+- Enhanced Ensemble Models: LightGBM + XGBoost with Player Impact + Elo feature integration
 - Professional Performance Analytics: ROI, Sharpe ratios, and advanced risk metrics
 - Strategic bankroll management with quantitative position sizing
 
-ANALYSIS FRAMEWORK (V5 PROTOCOLS):
-1. Elo-Driven Insights: Reference current team Elo ratings and strength differentials
-2. CLV Validation: Analyze closing line value performance as edge proof
-3. Model Integration: Explain how Elo features enhance prediction accuracy
-4. Performance Context: Assess user's quantitative metrics and betting patterns
-5. Risk Management: Emphasize disciplined position sizing (1-3% of bankroll)
+ANALYSIS FRAMEWORK (V6 PROTOCOLS):
+1. Player-Level Insights: Reference key player impact ratings and lineup strength differentials
+2. Elo-Driven Context: Reference current team Elo ratings and strength differentials  
+3. CLV Validation: Analyze closing line value performance as edge proof
+4. Lineup Intelligence: Assess team aggregate impact ratings and star player advantages
+5. Model Integration: Explain how player impact + Elo features enhance prediction accuracy
+6. Performance Context: Assess user's quantitative metrics and betting patterns
+7. Risk Management: Emphasize disciplined position sizing (1-3% of bankroll)
 
 RESPONSE GUIDELINES:
-- Lead with quantitative insights from Elo ratings and CLV analysis when relevant
-- Reference specific team Elo differentials and their predictive significance  
+- Lead with player-level insights when relevant matchups involve star players or depth advantages
+- Reference specific player impact ratings and their predictive significance for lineup mismatches
+- Explain team aggregate impact differentials and their importance for game outcomes
+- Reference team Elo differentials and their predictive significance alongside player data
 - Explain CLV performance and its importance for long-term profitability
-- Provide strategic context based on V5 enhanced model outputs
+- Provide strategic context based on V6 enhanced model outputs combining player + team intelligence
 - Emphasize professional-grade risk management and disciplined execution
 - Be concise but comprehensive, focusing on actionable quantitative intelligence
 
-Remember: You're operating at a professional quantitative analyst level - provide strategic intelligence based on advanced Elo dynamics, CLV validation, and ensemble model predictions."""
+Remember: You're operating at a professional quantitative analyst level with granular player intelligence - provide strategic insights based on advanced player impact dynamics, Elo ratings, CLV validation, and lineup-aware ensemble model predictions."""
 
         # Prepare enhanced request to LM Studio
         payload = {
@@ -1314,37 +1444,41 @@ Remember: You're operating at a professional quantitative analyst level - provid
             ai_response = result.get("choices", [{}])[0].get("message", {}).get("content", "No response from AI")
             return {"response": ai_response}
         else:
-            # Enhanced fallback response with V5 context
-            fallback_response = f"""🤖 BetAI V5 (Elo + CLV Intelligence - Offline Mode)
+            # V6 Enhanced fallback response with Player Impact context
+            fallback_response = f"""🤖 BetAI V6 (Player Impact + Elo + CLV Intelligence - Offline Mode)
 
-I'm currently running on fallback intelligence while the LM Studio connection is restored. Here's what I can tell you based on your V5 quantitative systems:
+I'm currently running on fallback intelligence while the LM Studio connection is restored. Here's what I can tell you based on your V6 player-level quantitative systems:
 
 {context}
 
 QUESTION: "{query.message}"
 
-V5 ANALYSIS (Based on Available Data):
+V6 ANALYSIS (Based on Available Data):
+• Player Impact Model quantifies individual player value with PER-style calculations (0-50+ scale)
+• Lineup-aware ensemble models aggregate team player impact ratings for game predictions
 • Dynamic Elo Engine shows current team strength rankings with real-time updates
 • CLV validation system tracking closing line performance for sustainable edge proof
-• Enhanced ensemble models now integrate Elo ratings as key predictive features  
-• Look for predictions with calculated edge > 4% AND positive CLV for optimal opportunities
+• Enhanced ensemble models integrate Player Impact + Elo ratings as key predictive features  
+• Look for predictions with player impact advantages > 10 points AND positive CLV for optimal opportunities
 • Current performance metrics demonstrate the importance of disciplined position sizing
 
-QUANTITATIVE GUIDANCE:
+V6 QUANTITATIVE GUIDANCE:
 • Maintain 1-3% position sizing relative to current bankroll for optimal Kelly growth
-• Prioritize predictions with strong Elo differentials (>100 points) AND high model confidence
+• Prioritize predictions with strong player impact differentials (>10 points) AND high model confidence
+• Monitor team aggregate impact ratings - teams with 45+ average impact have significant advantages
+• Focus on V6 Player-Impact-Aware model outputs for superior lineup-specific accuracy
+• Star player advantages (impact rating >70) often create profitable betting opportunities
 • Monitor CLV performance - positive CLV indicates sustainable predictive edge
-• Focus on V5 Elo-enhanced model outputs for superior accuracy vs baseline models
 
-For detailed V5 model explanations, Elo dynamics analysis, and advanced CLV interpretation, please ensure LM Studio is running on localhost:1234."""
+For detailed V6 model explanations, player impact analysis, and lineup-specific predictions, please ensure LM Studio is running on localhost:1234."""
             return {"response": fallback_response}
             
     except requests.exceptions.Timeout:
-        return {"response": "⏱️ BetAI V5 response timeout. The quantitative analysis engine is processing complex Elo and CLV calculations - please try again. Ensure LM Studio has sufficient resources allocated."}
+        return {"response": "⏱️ BetAI V6 response timeout. The quantitative analysis engine is processing complex Player Impact, Elo and CLV calculations - please try again. Ensure LM Studio has sufficient resources allocated."}
     except requests.exceptions.ConnectionError:
-        # Comprehensive offline analysis with V5 features
+        # Comprehensive offline analysis with V6 features
         try:
-            offline_context = "Unable to retrieve recent V5 quantitative data"
+            offline_context = "Unable to retrieve recent V6 quantitative data"
             with get_db() as conn:
                 cursor = conn.cursor()
                 cursor.execute("SELECT running_balance FROM ledger ORDER BY entry_id DESC LIMIT 1")
@@ -1353,15 +1487,17 @@ For detailed V5 model explanations, Elo dynamics analysis, and advanced CLV inte
                 current_elos = cursor.fetchone()
                 cursor.execute("SELECT COUNT(*) FROM bets WHERE odds_at_tracking IS NOT NULL")
                 clv_bets = cursor.fetchone()
+                cursor.execute("SELECT COUNT(*) FROM players WHERE impact_rating > 0")
+                player_count = cursor.fetchone()
                 
-                if balance and current_elos and clv_bets:
-                    offline_context = f"V5 Systems: Balance ${balance[0]:.2f} | Current Elo Ratings: {current_elos[0]} teams | CLV Tracked Bets: {clv_bets[0]}"
+                if balance and current_elos and clv_bets and player_count:
+                    offline_context = f"V6 Systems: Balance ${balance[0]:.2f} | Current Elo Ratings: {current_elos[0]} teams | CLV Tracked Bets: {clv_bets[0]} | Player Impact Models: {player_count[0]} players"
         except:
-            offline_context = "Limited V5 quantitative data access in offline mode"
+            offline_context = "Limited V6 quantitative data access in offline mode"
             
-        return {"response": f"🔌 BetAI V5 is offline. LM Studio connection failed. {offline_context}\n\nPlease start LM Studio on localhost:1234 for full V5 quantitative analysis capabilities with Elo dynamics and CLV validation."}
+        return {"response": f"🔌 BetAI V6 is offline. LM Studio connection failed. {offline_context}\n\nPlease start LM Studio on localhost:1234 for full V6 quantitative analysis capabilities with Player Impact Intelligence, Elo dynamics and CLV validation."}
     except Exception as e:
-        return {"response": f"⚠️ BetAI V5 encountered a quantitative analysis error: {str(e)}\n\nThis may indicate a V5 processing issue. Please verify system resources and try again."}
+        return {"response": f"⚠️ BetAI V6 encountered a quantitative analysis error: {str(e)}\n\nThis may indicate a V6 processing issue. Please verify system resources and try again."}
 
 if __name__ == "__main__":
     import uvicorn

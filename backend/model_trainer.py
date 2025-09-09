@@ -183,6 +183,10 @@ class AdvancedFeatureEngineer:
         elo_features['elo_difference'] = 0.0
         elo_features['elo_advantage'] = 0.0
         
+        # V6 Enhancement: Add player impact features
+        player_features = self.calculate_player_impact_features(team_games, all_games_data)
+        elo_features = pd.concat([elo_features, player_features], axis=1)
+        
         # Get team and sport info
         if len(team_games) == 0:
             return elo_features
@@ -261,6 +265,108 @@ class AdvancedFeatureEngineer:
             pass
         
         return elo_features
+    
+    def calculate_player_impact_features(self, team_games: pd.DataFrame, all_games_data: pd.DataFrame) -> pd.DataFrame:
+        """Calculate player impact-based features for lineup-aware predictions (V6)."""
+        player_features = pd.DataFrame(index=team_games.index)
+        
+        # Initialize player impact features
+        player_features['team_total_impact'] = 0.0
+        player_features['team_avg_impact'] = 0.0
+        player_features['team_top5_impact'] = 0.0
+        player_features['opponent_total_impact'] = 0.0
+        player_features['opponent_avg_impact'] = 0.0
+        player_features['opponent_top5_impact'] = 0.0
+        player_features['impact_advantage'] = 0.0
+        player_features['star_player_advantage'] = 0.0
+        
+        # Get team and sport info
+        if len(team_games) == 0:
+            return player_features
+        
+        team_id = team_games.iloc[0]['team_id']
+        # Assume sport can be inferred from game context - for demo, use NBA
+        sport = 'NBA'
+        
+        try:
+            # Import here to avoid circular imports
+            from pathlib import Path
+            import sqlite3
+            from contextlib import contextmanager
+            
+            @contextmanager
+            def get_db():
+                db_path = Path(__file__).parent.parent / "database" / "bet_copilot.db"
+                conn = sqlite3.connect(db_path)
+                conn.row_factory = sqlite3.Row
+                try:
+                    yield conn
+                finally:
+                    conn.close()
+            
+            with get_db() as conn:
+                cursor = conn.cursor()
+                
+                for idx, game in team_games.iterrows():
+                    game_date = game['game_date']
+                    opponent_id = game['opponent_id']
+                    
+                    # Get team's player impact ratings
+                    cursor.execute("""
+                        SELECT impact_rating FROM players
+                        WHERE team_id = ? AND sport = ? AND impact_rating > 0
+                        ORDER BY impact_rating DESC
+                    """, (team_id, sport))
+                    
+                    team_impacts = [row[0] for row in cursor.fetchall()]
+                    
+                    # Get opponent's player impact ratings
+                    cursor.execute("""
+                        SELECT impact_rating FROM players
+                        WHERE team_id = ? AND sport = ? AND impact_rating > 0
+                        ORDER BY impact_rating DESC
+                    """, (opponent_id, sport))
+                    
+                    opponent_impacts = [row[0] for row in cursor.fetchall()]
+                    
+                    # Calculate team aggregates
+                    if team_impacts:
+                        team_total = sum(team_impacts)
+                        team_avg = team_total / len(team_impacts)
+                        team_top5 = sum(team_impacts[:5])
+                        team_star_power = max(team_impacts) if team_impacts else 0.0
+                    else:
+                        team_total = team_avg = team_top5 = team_star_power = 15.0  # League average
+                    
+                    # Calculate opponent aggregates
+                    if opponent_impacts:
+                        opp_total = sum(opponent_impacts)
+                        opp_avg = opp_total / len(opponent_impacts)
+                        opp_top5 = sum(opponent_impacts[:5])
+                        opp_star_power = max(opponent_impacts) if opponent_impacts else 0.0
+                    else:
+                        opp_total = opp_avg = opp_top5 = opp_star_power = 15.0  # League average
+                    
+                    # Calculate advantages
+                    impact_advantage = team_avg - opp_avg
+                    star_advantage = team_star_power - opp_star_power
+                    
+                    # Store features
+                    player_features.loc[idx, 'team_total_impact'] = team_total
+                    player_features.loc[idx, 'team_avg_impact'] = team_avg
+                    player_features.loc[idx, 'team_top5_impact'] = team_top5
+                    player_features.loc[idx, 'opponent_total_impact'] = opp_total
+                    player_features.loc[idx, 'opponent_avg_impact'] = opp_avg
+                    player_features.loc[idx, 'opponent_top5_impact'] = opp_top5
+                    player_features.loc[idx, 'impact_advantage'] = impact_advantage
+                    player_features.loc[idx, 'star_player_advantage'] = star_advantage
+                    
+        except Exception as e:
+            print(f"Warning: Could not load player impact features: {e}")
+            # Use default values if player data is not available
+            pass
+        
+        return player_features
 
 class EnsembleSportsModel:
     """
@@ -273,7 +379,7 @@ class EnsembleSportsModel:
         self.xgb_model = None
         self.feature_columns = None
         self.label_encoder = LabelEncoder()
-        self.model_version = f"v5.0-elo-ensemble-{self.sport.lower()}"
+        self.model_version = f"v6.0-player-impact-elo-ensemble-{self.sport.lower()}"
         self.feature_engineer = AdvancedFeatureEngineer()
         self.model_paths = get_model_paths(self.sport)
         

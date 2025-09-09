@@ -115,6 +115,50 @@ def create_database():
         )
     """)
 
+    # Create players table for Player-Level Intelligence (V6)
+    cursor.execute("""
+        CREATE TABLE players (
+            player_id INTEGER PRIMARY KEY AUTOINCREMENT,
+            player_name TEXT NOT NULL,
+            team_id INTEGER NOT NULL,
+            sport TEXT NOT NULL,
+            position TEXT,
+            impact_rating REAL DEFAULT 0.0,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            FOREIGN KEY (team_id) REFERENCES teams (team_id),
+            CONSTRAINT unique_player_team_sport UNIQUE (player_name, team_id, sport)
+        )
+    """)
+
+    # Create player_game_stats table for granular box score data (V6)
+    cursor.execute("""
+        CREATE TABLE player_game_stats (
+            stat_id INTEGER PRIMARY KEY AUTOINCREMENT,
+            player_id INTEGER NOT NULL,
+            game_id INTEGER NOT NULL,
+            minutes_played REAL DEFAULT 0.0,
+            points INTEGER DEFAULT 0,
+            rebounds INTEGER DEFAULT 0,
+            assists INTEGER DEFAULT 0,
+            steals INTEGER DEFAULT 0,
+            blocks INTEGER DEFAULT 0,
+            turnovers INTEGER DEFAULT 0,
+            field_goals_made INTEGER DEFAULT 0,
+            field_goals_attempted INTEGER DEFAULT 0,
+            three_pointers_made INTEGER DEFAULT 0,
+            three_pointers_attempted INTEGER DEFAULT 0,
+            free_throws_made INTEGER DEFAULT 0,
+            free_throws_attempted INTEGER DEFAULT 0,
+            fouls INTEGER DEFAULT 0,
+            plus_minus REAL DEFAULT 0.0,
+            created_at TEXT NOT NULL,
+            FOREIGN KEY (player_id) REFERENCES players (player_id),
+            FOREIGN KEY (game_id) REFERENCES games (game_id),
+            CONSTRAINT unique_player_game UNIQUE (player_id, game_id)
+        )
+    """)
+
     # Create predictions table (for ML-generated AI predictions)
     cursor.execute("""
         CREATE TABLE predictions (
